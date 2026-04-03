@@ -24,7 +24,7 @@ Takes a user's questionnaire responses and compares them against other users' da
 
 ## Tech Stack
 
-| Technology Layer |
+| Tech Layer | |
 |---|---|
 | Frontend | TBD |
 | Backend + Algorithm | TBD |
