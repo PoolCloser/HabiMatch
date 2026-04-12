@@ -1,0 +1,15 @@
+# Environment variables - never commit these
+.env
+.env.local
+.env*.local
+
+# Dependencies
+node_modules/
+
+# Expo
+mobile/.expo/
+mobile/dist/
+
+# OS
+.DS_Store
+Thumbs.db
