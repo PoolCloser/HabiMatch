@@ -69,3 +69,33 @@ git merge main
 A good commit message explains what changed and why, not just how:
 - Bad: `fix stuff`
 - Good: `fix redirect loop on login when session token is missing`
+
+---
+
+## Running the Demo
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) v20 or later
+- [Expo Go](https://expo.dev/go) installed on your iOS or Android device
+
+### Steps
+
+1. **Install dependencies**
+   ```bash
+   cd mobile
+   npm install
+   ```
+
+2. **Start the dev server**
+   ```bash
+   npx expo start --clear
+   ```
+
+3. **Open on mobile/web**
+   - Scan the QR code in the terminal with the **Expo Go** app (Android) or the **Camera app** (iOS)
+   - OR to open web env: press 'w' in the terminal after starting server
+ 
+
+### Troubleshooting
+- If you see a bundling error, try stopping the server and rerunning `npx expo start --clear`
+- Make sure your phone and computer are on the **same Wi-Fi network**
