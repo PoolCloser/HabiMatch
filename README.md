@@ -26,9 +26,9 @@ Takes a user's questionnaire responses and compares them against other users' da
 
 | Layer | Tech |
 |---|---|
-| Frontend | TBD |
-| Backend + Algorithm | TBD |
-| Database | TBD |
+| Frontend | React Native |
+| Backend + Algorithm | Python |
+| Database | Supabase |
 
 > Note: The matching algorithm is not a separate service, it lives as a module within the backend.
 
