@@ -9,46 +9,60 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Screen } from '../../App';
+import { supabase } from '../lib/supabase';
+import { formatAuthError } from '../lib/authErrors';
 
 type Props = {
   navigate: (screen: Screen) => void;
 };
 
-export default function RegisterScreen({ navigate }: Props) {
+export default function LoginScreen({ navigate }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = async () => {
+  const handleLogin = async () => {
     setError('');
-    if (!email || !password || !confirmPassword) {
+    if (!email || !password) {
       setError('Please fill in all fields.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
       return;
     }
     setLoading(true);
     try {
-      // TODO: wire up Firebase Authentication (T-04)
-      console.log('Register attempted with:', email);
-      // navigate('Onboarding');
-    } catch {
-      setError('Registration failed. Please try again.');
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) {
+        setError(formatAuthError(signInError));
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForgotPassword = async () => {
+    setError('');
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError('Enter your email, then tap Forgot password.');
+      return;
+    }
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmed);
+    if (resetError) {
+      setError(formatAuthError(resetError));
+      return;
+    }
+    Alert.alert(
+      'Check your email',
+      'If an account exists for that address, we sent a link to reset your password.',
+    );
   };
 
   return (
@@ -59,12 +73,12 @@ export default function RegisterScreen({ navigate }: Props) {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.brand}>
           <Text style={styles.logo}>HabiMatch</Text>
-          <Text style={styles.tagline}>Find your perfect roommate</Text>
+          <Text style={styles.tagline}>Match where it matters</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Create an account</Text>
-          <Text style={styles.cardSubtitle}>Sign up to start finding roommates</Text>
+          <Text style={styles.cardTitle}>Welcome back</Text>
+          <Text style={styles.cardSubtitle}>Sign in to your account</Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -87,7 +101,7 @@ export default function RegisterScreen({ navigate }: Props) {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
-              placeholder="Minimum 8 characters"
+              placeholder="••••••••"
               placeholderTextColor="#aaa"
             />
             <TouchableOpacity
@@ -102,33 +116,27 @@ export default function RegisterScreen({ navigate }: Props) {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Confirm Password</Text>
-          <TextInput
-            style={styles.input}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry={!showPassword}
-            placeholder="••••••••"
-            placeholderTextColor="#aaa"
-          />
+          <TouchableOpacity style={styles.forgotBtn} onPress={handleForgotPassword}>
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
-            onPress={handleRegister}
+            onPress={handleLogin}
             disabled={loading}
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryBtnText}>Create Account</Text>
+              : <Text style={styles.primaryBtnText}>Sign In</Text>
             }
           </TouchableOpacity>
 
           <View style={styles.divider} />
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigate('Login')}>
-              <Text style={styles.switchLink}>Sign in</Text>
+            <Text style={styles.switchText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigate('Register')}>
+              <Text style={styles.switchLink}>Create one</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -173,6 +181,8 @@ const styles = StyleSheet.create({
   passwordRow: { position: 'relative', marginBottom: 4 },
   passwordInput: { marginBottom: 0, paddingRight: 48 },
   eyeBtn: { position: 'absolute', right: 14, top: 13 },
+  forgotBtn: { alignSelf: 'flex-end', marginTop: 6, marginBottom: 16 },
+  forgotText: { fontSize: 13, color: PRIMARY, fontWeight: '600' },
   primaryBtn: {
     backgroundColor: PRIMARY,
     borderRadius: 10,
