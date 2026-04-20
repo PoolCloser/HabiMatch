@@ -5,13 +5,20 @@ import type { Session } from '@supabase/supabase-js';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import ProfilePhotoScreen from './src/screens/ProfilePhotoScreen';
 import { supabase, isSupabaseConfigured } from './src/lib/supabase';
 
 export type Screen = 'Login' | 'Register';
 
+type ProfileRecord = {
+  avatar_url: string | null;
+};
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [needsPhotoSetup, setNeedsPhotoSetup] = useState(false);
   const [screen, setScreen] = useState<Screen>('Login');
 
   useEffect(() => {
@@ -34,6 +41,36 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!session) {
+        setNeedsPhotoSetup(false);
+        setProfileLoading(false);
+        return;
+      }
+
+      setProfileLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', session.user.id)
+          .maybeSingle<ProfileRecord>();
+
+        if (error) {
+          setNeedsPhotoSetup(true);
+          return;
+        }
+
+        setNeedsPhotoSetup(!data?.avatar_url);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    void loadProfile();
+  }, [session]);
+
   if (!isSupabaseConfigured()) {
     return (
       <>
@@ -51,7 +88,7 @@ export default function App() {
     );
   }
 
-  if (authLoading) {
+  if (authLoading || profileLoading) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#4A90D9" />
@@ -63,7 +100,14 @@ export default function App() {
     return (
       <>
         <StatusBar style="dark" />
-        <HomeScreen />
+        {needsPhotoSetup ? (
+          <ProfilePhotoScreen
+            userId={session.user.id}
+            onComplete={() => setNeedsPhotoSetup(false)}
+          />
+        ) : (
+          <HomeScreen />
+        )}
       </>
     );
   }
