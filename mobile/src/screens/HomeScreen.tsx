@@ -20,7 +20,6 @@ export default function HomeScreen() {
   return (
     <View style={styles.root}>
       <Text style={styles.title}>{"You're signed in"}</Text>
-      <Text style={styles.subtitle}>Build your main app flow from here.</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <TouchableOpacity
         style={[styles.btn, signingOut && styles.btnDisabled]}
@@ -47,11 +46,14 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '700', color: '#111', marginBottom: 8 },
   subtitle: { fontSize: 15, color: '#666', textAlign: 'center', marginBottom: 28 },
-  error: { color: '#d32f2f', marginBottom: 16, textAlign: 'center' },
+  error: {
+    color: '#d32f2f',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
   btn: {
     backgroundColor: PRIMARY,
     paddingVertical: 14,
-    paddingHorizontal: 32,
     borderRadius: 10,
     minWidth: 160,
     alignItems: 'center',
