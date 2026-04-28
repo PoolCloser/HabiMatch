@@ -1,8 +1,13 @@
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import type { MainScreen } from '../types/navigation';
 
-export default function HomeScreen() {
+type Props = {
+  navigate: (screen: MainScreen) => void;
+};
+
+export default function HomeScreen({ navigate }: Props) {
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,7 +25,13 @@ export default function HomeScreen() {
   return (
     <View style={styles.root}>
       <Text style={styles.title}>{"You're signed in"}</Text>
+      <Text style={styles.subtitle}>Build your main app flow from here.</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigate('Questionnaire')}>
+        <Text style={styles.secondaryBtnText}>Set up my Account</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={[styles.btn, signingOut && styles.btnDisabled]}
         onPress={handleSignOut}
@@ -45,12 +56,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   title: { fontSize: 22, fontWeight: '700', color: '#111', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: '#666', textAlign: 'center', marginBottom: 28 },
+  subtitle: { fontSize: 15, color: '#666', textAlign: 'center', marginBottom: 20 },
   error: {
     color: '#d32f2f',
     marginBottom: 16,
     textAlign: 'center',
   },
+  secondaryBtn: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#cfe3fb',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    minWidth: 220,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  secondaryBtnText: { color: PRIMARY, fontSize: 16, fontWeight: '700' },
   btn: {
     backgroundColor: PRIMARY,
     paddingVertical: 14,

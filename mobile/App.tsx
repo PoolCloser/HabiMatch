@@ -6,9 +6,13 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ProfilePhotoScreen from './src/screens/ProfilePhotoScreen';
+import QuestionnaireScreen from './src/screens/QuestionnaireScreen';
 import { supabase, isSupabaseConfigured } from './src/lib/supabase';
+import type { AuthScreen, MainScreen } from './src/types/navigation';
 
-export type Screen = 'Login' | 'Register';
+export type { AuthScreen, MainScreen };
+/** Login / Register routes (same as AuthScreen); kept for existing screen imports */
+export type Screen = AuthScreen;
 
 type ProfileRecord = {
   avatar_url: string | null;
@@ -19,7 +23,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [needsPhotoSetup, setNeedsPhotoSetup] = useState(false);
-  const [screen, setScreen] = useState<Screen>('Login');
+  const [screen, setScreen] = useState<AuthScreen>('Login');
+  const [mainScreen, setMainScreen] = useState<MainScreen>('Home');
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -71,6 +76,10 @@ export default function App() {
     void loadProfile();
   }, [session]);
 
+  useEffect(() => {
+    if (!session) setMainScreen('Home');
+  }, [session]);
+
   if (!isSupabaseConfigured()) {
     return (
       <>
@@ -105,14 +114,16 @@ export default function App() {
             userId={session.user.id}
             onComplete={() => setNeedsPhotoSetup(false)}
           />
+        ) : mainScreen === 'Questionnaire' ? (
+          <QuestionnaireScreen userId={session.user.id} navigate={setMainScreen} />
         ) : (
-          <HomeScreen />
+          <HomeScreen navigate={setMainScreen} />
         )}
       </>
     );
   }
 
-  const navigate = (to: Screen) => setScreen(to);
+  const navigate = (to: AuthScreen) => setScreen(to);
 
   return (
     <>
