@@ -1,6 +1,6 @@
 # HabiMatch
 
-HabiMatch is a roommate-matching platform like a dating app, but for finding compatible roommates. Users create a profile, answer a lifestyle questionnaire, and are shown ranked recommendations based on compatibility. Built as a team project for CSE 115A.
+HabiMatch is a roommate-matching platform like a dating app, but for finding compatible roommates. Users create a profile, answer a lifestyle questionnaire, and are shown ranked recommendations based on compatibility. 
 
 ---
 
