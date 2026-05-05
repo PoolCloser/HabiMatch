@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import type { Session } from '@supabase/supabase-js';
 import LoginScreen from './src/screens/LoginScreen';
@@ -18,7 +19,13 @@ type ProfileRecord = {
   avatar_url: string | null;
 };
 
-export default function App() {
+function isRefreshTokenError(message: string | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return m.includes('refresh token') || m.includes('invalid refresh');
+}
+
+function AppRoot() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -32,10 +39,25 @@ export default function App() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setAuthLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: s }, error }) => {
+        if (error) {
+          if (isRefreshTokenError(error.message)) {
+            void supabase.auth.signOut();
+          }
+          setSession(null);
+          setAuthLoading(false);
+          return;
+        }
+        setSession(s);
+        setAuthLoading(false);
+      })
+      .catch(() => {
+        void supabase.auth.signOut();
+        setSession(null);
+        setAuthLoading(false);
+      });
 
     const {
       data: { subscription },
@@ -134,6 +156,14 @@ export default function App() {
         <RegisterScreen navigate={navigate} />
       )}
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppRoot />
+    </SafeAreaProvider>
   );
 }
 
