@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import date
 from math import sqrt
-from typing import Literal
-
 from pydantic import BaseModel, Field, model_validator
 
 SCORE_MIN = 0
@@ -31,13 +29,9 @@ class MatchPreferences(BaseModel):
     ok_with_alcohol: bool
     has_pets: bool
     ok_with_pets: bool
-    partner_stays_over: bool
-    ok_with_partners_staying: bool
-    shares_food: bool
-    ok_with_coed: bool
+    partner_stays_over: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
+    ok_with_partners_staying: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
     study_or_wfh: bool
-    preferred_age_min: int = Field(ge=18, le=120)
-    preferred_age_max: int = Field(ge=18, le=120)
     budget_min: int = Field(ge=0)
     budget_max: int = Field(ge=0)
     move_in_date: date
@@ -53,13 +47,10 @@ class MatchPreferences(BaseModel):
     guest_tolerance_score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
     conflict_behavior_score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
     conflict_tolerance_score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
-    cohabitation_behavior_score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
     cohabitation_tolerance_score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
 
     @model_validator(mode="after")
     def validate_ranges(self) -> "MatchPreferences":
-        if self.preferred_age_max < self.preferred_age_min:
-            raise ValueError("preferred_age_max must be greater than or equal to preferred_age_min")
         if self.budget_max < self.budget_min:
             raise ValueError("budget_max must be greater than or equal to budget_min")
         return self
@@ -67,8 +58,6 @@ class MatchPreferences(BaseModel):
 
 class MatchParticipant(BaseModel):
     user_id: str | None = None
-    age: int = Field(ge=18, le=120)
-    gender: Literal["man", "woman"] | None = None
     preferences: MatchPreferences
 
 
@@ -83,15 +72,10 @@ class FilterDetails(BaseModel):
     move_in_compatible: bool
     move_in_gap_days: int
     move_in_score: float
-    age_compatible: bool
-    coed_compatible: bool
     smoking_compatible: bool
     marijuana_compatible: bool
     alcohol_compatible: bool
     pets_compatible: bool
-    guests_compatible: bool
-    food_sharing_compatible: bool
-    food_sharing_score: float
 
 
 class CompatibilityResponse(BaseModel):
@@ -176,23 +160,12 @@ def _build_filter_details(left: MatchParticipant, right: MatchParticipant) -> Fi
     move_in_gap_days = abs((left_p.move_in_date - right_p.move_in_date).days)
     move_in_compatible = move_in_gap_days <= MOVE_IN_MAX_GAP_DAYS
     move_in_score = _move_in_score(move_in_gap_days)
-    age_compatible = (
-        right_p.preferred_age_min <= left.age <= right_p.preferred_age_max
-        and left_p.preferred_age_min <= right.age <= left_p.preferred_age_max
-    )
-    coed_compatible = True
-    if left.gender and right.gender and left.gender != right.gender:
-        coed_compatible = left_p.ok_with_coed and right_p.ok_with_coed
-    food_sharing_compatible = left_p.shares_food == right_p.shares_food
-
     return FilterDetails(
         budget_overlap=budget_overlap,
         budget_overlap_ratio=round(budget_overlap_ratio, 4),
         move_in_compatible=move_in_compatible,
         move_in_gap_days=move_in_gap_days,
         move_in_score=round(move_in_score, 4),
-        age_compatible=age_compatible,
-        coed_compatible=coed_compatible,
         smoking_compatible=_boolean_pair_compatible(
             left_p.smokes,
             left_p.ok_with_smoking,
@@ -217,14 +190,6 @@ def _build_filter_details(left: MatchParticipant, right: MatchParticipant) -> Fi
             right_p.has_pets,
             right_p.ok_with_pets,
         ),
-        guests_compatible=_boolean_pair_compatible(
-            left_p.partner_stays_over,
-            left_p.ok_with_partners_staying,
-            right_p.partner_stays_over,
-            right_p.ok_with_partners_staying,
-        ),
-        food_sharing_compatible=food_sharing_compatible,
-        food_sharing_score=1.0 if food_sharing_compatible else 0.5,
     )
 
 
@@ -234,10 +199,6 @@ def _filter_failures(details: FilterDetails) -> list[str]:
         failures.append("Budget ranges do not overlap.")
     if not details.move_in_compatible:
         failures.append("Move-in timelines are too far apart.")
-    if not details.age_compatible:
-        failures.append("Age preferences are not mutually compatible.")
-    if not details.coed_compatible:
-        failures.append("Coed living preference is not mutually compatible.")
     if not details.smoking_compatible:
         failures.append("Smoking preference is not mutually compatible.")
     if not details.marijuana_compatible:
@@ -246,8 +207,6 @@ def _filter_failures(details: FilterDetails) -> list[str]:
         failures.append("Alcohol preference is not mutually compatible.")
     if not details.pets_compatible:
         failures.append("Pet preference is not mutually compatible.")
-    if not details.guests_compatible:
-        failures.append("Overnight guest preference is not mutually compatible.")
     return failures
 
 
@@ -269,9 +228,8 @@ def calculate_compatibility(left: MatchParticipant, right: MatchParticipant) -> 
     right_p = right.preferences
 
     logistics_score = (
-        (details.budget_overlap_ratio * 0.45)
-        + (details.move_in_score * 0.45)
-        + (details.food_sharing_score * 0.10)
+        (details.budget_overlap_ratio * 0.50)
+        + (details.move_in_score * 0.50)
     )
     sleep_score = _threshold_score(
         left_p.sleep_behavior_score,
@@ -298,22 +256,27 @@ def calculate_compatibility(left: MatchParticipant, right: MatchParticipant) -> 
         right_p.noise_behavior_score,
         right_p.noise_tolerance_score,
     )
-    guests_score = _threshold_score(
+    general_guests_score = _threshold_score(
         left_p.guest_behavior_score,
         left_p.guest_tolerance_score,
         right_p.guest_behavior_score,
         right_p.guest_tolerance_score,
     )
+    overnight_score = _threshold_score(
+        left_p.partner_stays_over,
+        left_p.ok_with_partners_staying,
+        right_p.partner_stays_over,
+        right_p.ok_with_partners_staying,
+    )
+    guests_score = (general_guests_score + overnight_score) / 2
     conflict_score = _paired_similarity_score(
         left_p.conflict_behavior_score,
         left_p.conflict_tolerance_score,
         right_p.conflict_behavior_score,
         right_p.conflict_tolerance_score,
     )
-    cohabitation_score = _paired_similarity_score(
-        left_p.cohabitation_behavior_score,
+    cohabitation_score = _similarity_score(
         left_p.cohabitation_tolerance_score,
-        right_p.cohabitation_behavior_score,
         right_p.cohabitation_tolerance_score,
     )
 
@@ -329,14 +292,16 @@ def calculate_compatibility(left: MatchParticipant, right: MatchParticipant) -> 
     subdomains = {
         "budget": round(details.budget_overlap_ratio, 4),
         "move_in": round(details.move_in_score, 4),
-        "food_sharing": round(details.food_sharing_score, 4),
         "cleaning": round(cleaning_score, 4),
         "cooking": round(cooking_score, 4),
     }
 
     weights = dict(BASE_DOMAIN_WEIGHTS)
-    if left_p.study_or_wfh or right_p.study_or_wfh:
-        weights["noise"] *= NOISE_WFH_MULTIPLIER
+    wfh_sensitivity = max(
+        (SCORE_MAX - left_p.noise_tolerance_score) / SCORE_MAX if left_p.study_or_wfh else 0,
+        (SCORE_MAX - right_p.noise_tolerance_score) / SCORE_MAX if right_p.study_or_wfh else 0,
+    )
+    weights["noise"] *= 1 + (NOISE_WFH_MULTIPLIER - 1) * wfh_sensitivity
 
     total_weight = sum(weights.values())
     normalized_weights = {

@@ -23,22 +23,24 @@ If they pass, the backend computes scored domains and combines them with fixed w
 
 ## Current onboarding order
 
-The questionnaire is ordered for lower-friction onboarding while still surfacing strong dealbreakers early.
+The questionnaire is ordered to surface hard logistical mismatches first, then binary dealbreakers while momentum is high, then scored lifestyle questions at the end.
 
-1. Move-in timing
-2. Smoking behavior and tolerance
-3. Marijuana behavior and tolerance
-4. Alcohol behavior and tolerance
-5. Pets behavior and tolerance
-6. Overnight guest behavior and tolerance
-7. Coed preference
-8. Food-sharing expectation
-9. Budget range
-10. Preferred roommate age range
-11. Work/study-from-home flag
-12. Lifestyle scoring questions
-
-The first section is intentionally heavy on quick tap-based questions before numeric inputs.
+1. Budget range
+2. Move-in timing
+3. Smoking behavior and tolerance
+4. Marijuana behavior and tolerance
+5. Alcohol behavior and tolerance
+6. Pets behavior and tolerance
+7. Sleep bedtime
+8. Sleep noise tolerance
+9. Work/study-from-home flag
+10. Noise behavior and tolerance
+11. Overnight guest frequency and tolerance
+12. Overnight guest hard yes/no (frequency-based, scored)
+13. Cleanliness behavior and tolerance
+14. Cooking behavior and tolerance
+15. Conflict style behavior and tolerance
+16. Cohabitation preference
 
 ## Stored fields
 
@@ -52,13 +54,7 @@ The first section is intentionally heavy on quick tap-based questions before num
 - `ok_with_alcohol`
 - `has_pets`
 - `ok_with_pets`
-- `partner_stays_over`
-- `ok_with_partners_staying`
-- `shares_food`
-- `ok_with_coed`
 - `study_or_wfh`
-- `preferred_age_min`
-- `preferred_age_max`
 - `budget_min`
 - `budget_max`
 - `move_in_date`
@@ -69,17 +65,18 @@ All score fields use integers from `0` to `4`.
 
 - `sleep_behavior_score`
 - `sleep_tolerance_score`
-- `clean_behavior_score`
-- `clean_tolerance_score`
-- `cooking_behavior_score`
-- `cooking_tolerance_score`
 - `noise_behavior_score`
 - `noise_tolerance_score`
 - `guest_behavior_score`
 - `guest_tolerance_score`
+- `partner_stays_over` — overnight guest frequency (0 = never, 4 = several times a week)
+- `ok_with_partners_staying` — overnight guest tolerance (0 = never ok, 4 = no limit)
+- `clean_behavior_score`
+- `clean_tolerance_score`
+- `cooking_behavior_score`
+- `cooking_tolerance_score`
 - `conflict_behavior_score`
 - `conflict_tolerance_score`
-- `cohabitation_behavior_score`
 - `cohabitation_tolerance_score`
 
 ## Current scored domains
@@ -90,26 +87,23 @@ Inputs:
 
 - budget overlap
 - move-in date gap
-- food-sharing expectation match
 
 Scoring style:
 
 - soft scored domain after minimum viability checks
-- budget and move-in can still fail the pair if they are not viable
-- food sharing is only a soft preference signal
+- budget and move-in can still fail the pair as hard filters if they are not viable
 
 Subscore weights:
 
-- budget overlap: 45%
-- move-in timing: 45%
-- food sharing: 10%
+- budget overlap: 50%
+- move-in timing: 50%
 
 ### 2. Sleep
 
 Questions:
 
-- behavior: usual weeknight sleep time
-- tolerance: response to noise at 1am
+- behavior: usual weeknight sleep time (time picker, converted to 0–4 score)
+- tolerance: response to roommate noise at 1am
 
 Scoring style:
 
@@ -141,18 +135,22 @@ Questions:
 Scoring style:
 
 - threshold-based
-- if either user answers `study_or_wfh = true`, the noise domain weight is increased by 25% before weights are renormalized
+- if either user works or studies from home, the noise domain weight is boosted before renormalization
+- boost scales with the WFH user's `noise_tolerance_score`: a fully noise-sensitive WFH user gets the full `1.25×` multiplier; a fully noise-tolerant WFH user gets no boost
 
 ### 5. Guests
 
 Questions:
 
-- guest frequency behavior
-- tolerance for frequent roommate guests
+- general guest frequency behavior
+- general guest tolerance
+- overnight guest frequency (`partner_stays_over`, 0–4)
+- overnight guest tolerance (`ok_with_partners_staying`, 0–4)
 
 Scoring style:
 
 - threshold-based
+- domain score is the average of the general guest subscore and the overnight guest subscore
 
 ### 6. Conflict style
 
@@ -168,15 +166,14 @@ Scoring style:
 
 ### 7. Cohabitation style
 
-Questions:
+Question:
 
-- typical roommate interaction behavior
 - ideal amount of roommate interaction at home
 
 Scoring style:
 
 - similarity-based
-- behavior similarity and preference similarity are averaged
+- single similarity between the two users' preference scores
 
 ## Hard-filter rules
 
@@ -190,7 +187,6 @@ These are symmetric. A pair fails if either person does the behavior and the oth
 - marijuana
 - alcohol
 - pets
-- overnight guests
 
 ### Budget overlap
 
@@ -206,7 +202,7 @@ If the pair passes, budget overlap also contributes to the logistics domain. The
 
 ### Move-in compatibility
 
-The questionnaire currently stores a single derived `move_in_date`, not a full availability range.
+The questionnaire stores a single derived `move_in_date`, not a full availability range.
 
 Current backend rule:
 
@@ -219,30 +215,6 @@ If the pair passes, move-in timing also contributes to the logistics domain:
 move_in_score = 1 - move_in_gap_days / 90
 ```
 
-### Food sharing
-
-Food sharing is no longer a hard filter.
-
-- if both people answer the same way, `food_sharing_score = 1.0`
-- if their expectations differ, `food_sharing_score = 0.5`
-
-This lets food expectations affect ranking without disqualifying otherwise strong matches.
-
-### Age preference compatibility
-
-The pair fails unless:
-
-- left age is inside right preferred age range
-- right age is inside left preferred age range
-
-### Coed compatibility
-
-Current backend rule:
-
-- if genders differ, both people must have `ok_with_coed = true`
-- if genders match, the pair passes this filter
-- if gender is unavailable for either user, this filter is not enforced
-
 ## Domain formulas
 
 ### Threshold formula
@@ -253,7 +225,7 @@ Used for:
 - cleaning
 - cooking
 - noise
-- guests
+- guests (general and overnight)
 
 Formula:
 
@@ -274,10 +246,8 @@ Interpretation:
 
 Used for:
 
-- conflict behavior
-- conflict tolerance
-- cohabitation behavior
-- cohabitation preference
+- conflict style (paired: behavior + tolerance averaged)
+- cohabitation preference (single value)
 
 Single-value similarity:
 
@@ -309,10 +279,9 @@ Base weights:
 | Cohabitation | 0.20 |
 | Conflict | 0.10 |
 
-If either user works or studies from home:
+Note: these sum to `1.10`. The backend normalizes them to `1.0` before computing the final score.
 
-- noise weight is multiplied by `1.25`
-- all weights are then renormalized so they still sum to `1.0`
+If either user works or studies from home, the noise weight is boosted proportionally to how noise-sensitive that user is, then all weights are renormalized.
 
 ## Final score
 
@@ -342,15 +311,9 @@ The backend returns:
 
 - `budget`
 - `move_in`
-- `food_sharing`
 - `cleaning`
 - `cooking`
 
 ## Notes on current implementation gaps
 
-The following are intentionally documented as current-state tradeoffs:
-
 - `move_in_date` is matched by date-gap threshold because the current questionnaire stores a single target date, not a true range
-- `shares_food` is a soft preference because the current questionnaire does not capture a separate tolerance field
-
-If the questionnaire expands later, these are the main places where the matching model can become more expressive without rewriting the whole scoring pipeline.

@@ -24,16 +24,13 @@ type AnswerKey =
   | 'drinks_alcohol' | 'ok_with_alcohol'
   | 'has_pets' | 'ok_with_pets'
   | 'partner_stays_over' | 'ok_with_partners_staying'
-  | 'shares_food'
-  | 'ok_with_coed'
   | 'study_or_wfh' | 'budget_min' | 'budget_max' | 'move_in'
-  | 'preferred_age_min' | 'preferred_age_max'
   | 'sleep_behavior_score' | 'sleep_tolerance_score'
   | 'clean_behavior_score' | 'clean_tolerance_score' | 'cooking_behavior_score' | 'cooking_tolerance_score'
   | 'noise_behavior_score' | 'noise_tolerance_score'
   | 'guest_behavior_score' | 'guest_tolerance_score'
   | 'conflict_behavior_score' | 'conflict_tolerance_score'
-  | 'cohabitation_behavior_score' | 'cohabitation_tolerance_score';
+  | 'cohabitation_tolerance_score';
 
 type Answers = Record<AnswerKey, string>;
 
@@ -51,12 +48,6 @@ type BudgetStep = {
   question: string;
 };
 
-type AgeRangeStep = {
-  type: 'age_range';
-  category: string;
-  question: string;
-};
-
 type TimePickerStep = {
   type: 'time_picker';
   category: string;
@@ -64,7 +55,7 @@ type TimePickerStep = {
   field: AnswerKey;
 };
 
-type Step = OptionsStep | BudgetStep | AgeRangeStep | TimePickerStep;
+type Step = OptionsStep | BudgetStep | TimePickerStep;
 
 const YES_NO = [
   { label: 'Yes', value: 'yes' },
@@ -79,7 +70,8 @@ const SKIP_IF_YES: Partial<Record<AnswerKey, AnswerKey>> = {
 };
 
 const STEPS: Step[] = [
-  // Start with one easy high-signal logistics question.
+  // Logistics filters first — hard mismatches caught before anything else.
+  { type: 'budget_range', category: 'Logistics', question: "What's your monthly rent budget?" },
   {
     category: 'Logistics',
     question: 'When are you looking to move in?',
@@ -92,7 +84,7 @@ const STEPS: Step[] = [
     ],
   },
 
-  // Then front-load the strongest yes/no dealbreakers while momentum is high.
+  // Yes/no dealbreakers.
   { category: 'Lifestyle', question: 'Do you smoke cigarettes?', field: 'smokes', options: YES_NO },
   { category: 'Lifestyle', question: 'Are you OK living with a smoker?', field: 'ok_with_smoking', options: YES_NO },
   { category: 'Lifestyle', question: 'Do you use marijuana?', field: 'uses_marijuana', options: YES_NO },
@@ -101,17 +93,8 @@ const STEPS: Step[] = [
   { category: 'Lifestyle', question: 'Are you OK living with someone who drinks at home?', field: 'ok_with_alcohol', options: YES_NO },
   { category: 'Home Life', question: 'Do you have pets?', field: 'has_pets', options: YES_NO },
   { category: 'Home Life', question: 'Is it OK if a housemate has pets?', field: 'ok_with_pets', options: YES_NO },
-  { category: 'Home Life', question: 'Do you frequently have overnight guests?', field: 'partner_stays_over', options: YES_NO },
-  { category: 'Home Life', question: 'Are you OK if a roommate frequently has overnight guests?', field: 'ok_with_partners_staying', options: YES_NO },
-  { category: 'Home Life', question: 'Are you OK with a coed living situation?', field: 'ok_with_coed', options: YES_NO },
-  { category: 'Home Life', question: 'Do you expect to share groceries or food with your roommate?', field: 'shares_food', options: YES_NO },
 
-  // Put the more effortful inputs after the quick filters.
-  { type: 'budget_range', category: 'Logistics', question: "What's your monthly rent budget?" },
-  { type: 'age_range', category: 'Logistics', question: 'What age range are you comfortable living with?' },
-  { category: 'Logistics', question: 'Do you work or study from home regularly?', field: 'study_or_wfh', options: YES_NO },
-
-  // Then move into broader day-to-day compatibility.
+  // Sleep — grouped with WFH and noise since they're all about schedule and environment.
   {
     type: 'time_picker',
     category: 'Sleep & Schedule',
@@ -130,7 +113,83 @@ const STEPS: Step[] = [
       { label: "Not bothered at all", value: '4' },
     ],
   },
+  { category: 'Logistics', question: 'Do you work or study from home regularly?', field: 'study_or_wfh', options: YES_NO },
+  {
+    category: 'Noise & Environment',
+    question: "What's your apartment usually like on a Saturday afternoon?",
+    field: 'noise_behavior_score',
+    options: [
+      { label: 'Very quiet - reading, working, or resting', value: '0' },
+      { label: 'Low-key - maybe some background music', value: '1' },
+      { label: 'Active - TV or music on, some movement', value: '2' },
+      { label: 'Lively - often have people over or gaming', value: '3' },
+      { label: 'Loud - music up, lots going on', value: '4' },
+    ],
+  },
+  {
+    category: 'Noise & Environment',
+    question: 'Your roommate is playing music while you try to focus. How do you feel?',
+    field: 'noise_tolerance_score',
+    options: [
+      { label: 'Very bothered - I need near-silence to focus', value: '0' },
+      { label: "Bothered - I'd need to ask them to turn it down", value: '1' },
+      { label: "Slightly annoyed - I'd put on headphones", value: '2' },
+      { label: 'Barely bothered - I can tune it out', value: '3' },
+      { label: 'Not bothered at all', value: '4' },
+    ],
+  },
 
+  // Guests — scored questions first, then the hard yes/no filters.
+  {
+    category: 'Guests & Social',
+    question: 'How often do you have people over in a typical month?',
+    field: 'guest_behavior_score',
+    options: [
+      { label: 'Rarely or never', value: '0' },
+      { label: 'A few times (2-4)', value: '1' },
+      { label: 'About once a week', value: '2' },
+      { label: 'Several times a week', value: '3' },
+      { label: 'Almost daily', value: '4' },
+    ],
+  },
+  {
+    category: 'Guests & Social',
+    question: 'Your roommate has people over 3-4 nights a week. How do you feel?',
+    field: 'guest_tolerance_score',
+    options: [
+      { label: "Very uncomfortable - that's too much for me", value: '0' },
+      { label: 'Could manage occasionally but not regularly', value: '1' },
+      { label: 'OK with it as long as I still get quiet nights', value: '2' },
+      { label: 'That seems pretty normal to me', value: '3' },
+      { label: 'No problem at all', value: '4' },
+    ],
+  },
+  {
+    category: 'Home Life',
+    question: 'How often do you have overnight guests?',
+    field: 'partner_stays_over',
+    options: [
+      { label: 'Never or almost never', value: '0' },
+      { label: 'A few times a year', value: '1' },
+      { label: 'Once or twice a month', value: '2' },
+      { label: 'About once a week', value: '3' },
+      { label: 'Several times a week or more', value: '4' },
+    ],
+  },
+  {
+    category: 'Home Life',
+    question: 'How often would you be OK with a roommate having overnight guests?',
+    field: 'ok_with_partners_staying',
+    options: [
+      { label: "Never - I'd really prefer they don't", value: '0' },
+      { label: 'Rarely - a few times a year is fine', value: '1' },
+      { label: 'Occasionally - once or twice a month is fine', value: '2' },
+      { label: 'Regularly - about once a week is fine', value: '3' },
+      { label: 'As often as they like', value: '4' },
+    ],
+  },
+
+  // Cleanliness and cooking.
   {
     category: 'Cleanliness',
     question: 'In the last month, how often did you clean shared spaces?',
@@ -167,7 +226,6 @@ const STEPS: Step[] = [
       { label: 'Daily, including big meals or meal prepping', value: '4' },
     ],
   },
-
   {
     category: 'Cleanliness',
     question: 'How do you feel about a roommate who cooks frequently?',
@@ -181,56 +239,7 @@ const STEPS: Step[] = [
     ],
   },
 
-  {
-    category: 'Noise & Environment',
-    question: "What's your apartment usually like on a Saturday afternoon?",
-    field: 'noise_behavior_score',
-    options: [
-      { label: 'Very quiet - reading, working, or resting', value: '0' },
-      { label: 'Low-key - maybe some background music', value: '1' },
-      { label: 'Active - TV or music on, some movement', value: '2' },
-      { label: 'Lively - often have people over or gaming', value: '3' },
-      { label: 'Loud - music up, lots going on', value: '4' },
-    ],
-  },
-  {
-    category: 'Noise & Environment',
-    question: 'Your roommate is playing music while you try to focus. How do you feel?',
-    field: 'noise_tolerance_score',
-    options: [
-      { label: 'Very bothered - I need near-silence to focus', value: '0' },
-      { label: "Bothered - I'd need to ask them to turn it down", value: '1' },
-      { label: "Slightly annoyed - I'd put on headphones", value: '2' },
-      { label: 'Barely bothered - I can tune it out', value: '3' },
-      { label: 'Not bothered at all', value: '4' },
-    ],
-  },
-
-  {
-    category: 'Guests & Social',
-    question: 'How often do you have people over in a typical month?',
-    field: 'guest_behavior_score',
-    options: [
-      { label: 'Rarely or never', value: '0' },
-      { label: 'A few times (2-4)', value: '1' },
-      { label: 'About once a week', value: '2' },
-      { label: 'Several times a week', value: '3' },
-      { label: 'Almost daily', value: '4' },
-    ],
-  },
-  {
-    category: 'Guests & Social',
-    question: 'Your roommate has people over 3-4 nights a week. How do you feel?',
-    field: 'guest_tolerance_score',
-    options: [
-      { label: "Very uncomfortable - that's too much for me", value: '0' },
-      { label: 'Could manage occasionally but not regularly', value: '1' },
-      { label: 'OK with it as long as I still get quiet nights', value: '2' },
-      { label: 'That seems pretty normal to me', value: '3' },
-      { label: 'No problem at all', value: '4' },
-    ],
-  },
-
+  // Conflict and cohabitation style last — most reflective, least likely to cause drop-off.
   {
     category: 'Conflict Style',
     question: 'Something in the apartment has been bothering you for a week. What do you do?',
@@ -253,19 +262,6 @@ const STEPS: Step[] = [
       { label: 'Bring it up whenever - no pressure', value: '2' },
       { label: 'Talk to me directly', value: '3' },
       { label: 'Tell me immediately and directly', value: '4' },
-    ],
-  },
-
-  {
-    category: 'Cohabitation Style',
-    question: 'On a typical week, how much do you interact with your roommate at home?',
-    field: 'cohabitation_behavior_score',
-    options: [
-      { label: 'Almost never - we mostly live parallel lives', value: '0' },
-      { label: 'A brief hello or quick chat here and there', value: '1' },
-      { label: 'A few casual conversations in common spaces', value: '2' },
-      { label: 'We regularly hang out at home', value: '3' },
-      { label: 'A lot - my roommate feels like a close friend', value: '4' },
     ],
   },
   {
@@ -305,15 +301,13 @@ const EMPTY_ANSWERS: Answers = {
   ...Object.fromEntries(
     STEPS
       .filter((s): s is OptionsStep =>
-        s.type !== 'budget_range' && s.type !== 'age_range' && s.type !== 'time_picker',
+        s.type !== 'budget_range' && s.type !== 'time_picker',
       )
       .map(s => [s.field, '']),
   ),
   sleep_behavior_score: String(timeToScore(defaultBedtime)),
   budget_min: '',
   budget_max: '',
-  preferred_age_min: '',
-  preferred_age_max: '',
 } as Answers;
 
 const describeSaveError = (saveError: unknown): string => {
@@ -358,31 +352,22 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
   const effectiveSteps = STEPS.filter(
     s =>
       s.type === 'budget_range' ||
-      s.type === 'age_range' ||
       s.type === 'time_picker' ||
       !skippedFields.has((s as OptionsStep).field),
   );
 
   const current = effectiveSteps[step];
   const isBudgetStep = current.type === 'budget_range';
-  const isAgeRangeStep = current.type === 'age_range';
   const isTimePickerStep = current.type === 'time_picker';
   const budgetValid =
     answers.budget_min !== '' &&
     answers.budget_max !== '' &&
     Number(answers.budget_max) >= Number(answers.budget_min);
-  const ageRangeValid =
-    answers.preferred_age_min !== '' &&
-    answers.preferred_age_max !== '' &&
-    Number(answers.preferred_age_min) >= 18 &&
-    Number(answers.preferred_age_max) >= Number(answers.preferred_age_min);
   const isComplete = isBudgetStep
     ? budgetValid
-    : isAgeRangeStep
-      ? ageRangeValid
-      : isTimePickerStep
-        ? true
-        : Boolean(answers[(current as OptionsStep).field]);
+    : isTimePickerStep
+      ? true
+      : Boolean(answers[(current as OptionsStep).field]);
 
   const handleTimeChange = (_: DateTimePickerEvent, date?: Date) => {
     if (!date) return;
@@ -429,13 +414,9 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
         ok_with_alcohol: yesNo('ok_with_alcohol'),
         has_pets: yesNo('has_pets'),
         ok_with_pets: yesNo('ok_with_pets'),
-        partner_stays_over: yesNo('partner_stays_over'),
-        ok_with_partners_staying: yesNo('ok_with_partners_staying'),
-        shares_food: yesNo('shares_food'),
-        ok_with_coed: yesNo('ok_with_coed'),
+        partner_stays_over: score('partner_stays_over'),
+        ok_with_partners_staying: score('ok_with_partners_staying'),
         study_or_wfh: yesNo('study_or_wfh'),
-        preferred_age_min: parseInt(answers.preferred_age_min, 10),
-        preferred_age_max: parseInt(answers.preferred_age_max, 10),
         budget_min: parseInt(answers.budget_min, 10),
         budget_max: parseInt(answers.budget_max, 10),
         move_in_date: moveInDate.toISOString().split('T')[0],
@@ -451,7 +432,6 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
         guest_tolerance_score: score('guest_tolerance_score'),
         conflict_behavior_score: score('conflict_behavior_score'),
         conflict_tolerance_score: score('conflict_tolerance_score'),
-        cohabitation_behavior_score: score('cohabitation_behavior_score'),
         cohabitation_tolerance_score: score('cohabitation_tolerance_score'),
         updated_at: new Date().toISOString(),
       };
@@ -501,48 +481,10 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
           </View>
-          <Text style={styles.stepLabel}>
-            {step + 1} of {effectiveSteps.length}
-          </Text>
-
           <Text style={styles.category}>{current.category}</Text>
           <Text style={styles.question}>{current.question}</Text>
 
-          {isAgeRangeStep ? (
-            <View style={styles.budgetRow}>
-              <View style={styles.budgetField}>
-                <Text style={styles.budgetLabel}>Min age</Text>
-                <View style={styles.budgetInputWrap}>
-                  <TextInput
-                    style={styles.budgetInput}
-                    keyboardType="number-pad"
-                    value={answers.preferred_age_min}
-                    onChangeText={v =>
-                      setAnswers(prev => ({ ...prev, preferred_age_min: v.replace(/[^0-9]/g, '') }))
-                    }
-                    placeholder="18"
-                    maxLength={3}
-                  />
-                </View>
-              </View>
-              <Text style={styles.budgetSep}>-</Text>
-              <View style={styles.budgetField}>
-                <Text style={styles.budgetLabel}>Max age</Text>
-                <View style={styles.budgetInputWrap}>
-                  <TextInput
-                    style={styles.budgetInput}
-                    keyboardType="number-pad"
-                    value={answers.preferred_age_max}
-                    onChangeText={v =>
-                      setAnswers(prev => ({ ...prev, preferred_age_max: v.replace(/[^0-9]/g, '') }))
-                    }
-                    placeholder="99"
-                    maxLength={3}
-                  />
-                </View>
-              </View>
-            </View>
-          ) : isTimePickerStep ? (
+          {isTimePickerStep ? (
             <DateTimePicker
               value={timePickerDate}
               mode="time"
@@ -661,7 +603,6 @@ const styles = StyleSheet.create({
     backgroundColor: PRIMARY,
     borderRadius: 3,
   },
-  stepLabel: { fontSize: 12, color: '#999', textAlign: 'right', marginBottom: 20 },
   category: {
     fontSize: 12,
     fontWeight: '700',

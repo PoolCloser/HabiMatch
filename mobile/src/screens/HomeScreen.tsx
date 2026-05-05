@@ -55,7 +55,6 @@ type PreferenceRecord = {
   guest_tolerance_score: number | null;
   conflict_behavior_score: number | null;
   conflict_tolerance_score: number | null;
-  cohabitation_behavior_score: number | null;
   cohabitation_tolerance_score: number | null;
 };
 
@@ -112,7 +111,6 @@ const PREFERENCE_COLUMNS = [
   'guest_tolerance_score',
   'conflict_behavior_score',
   'conflict_tolerance_score',
-  'cohabitation_behavior_score',
   'cohabitation_tolerance_score',
 ].join(',');
 
@@ -333,9 +331,6 @@ function toMatchPreferences(row: PreferenceRecord): MatchPreferences | null {
   const guestToleranceScore = requiredScore(row.guest_tolerance_score);
   const conflictBehaviorScore = requiredScore(row.conflict_behavior_score);
   const conflictToleranceScore = requiredScore(row.conflict_tolerance_score);
-  const cohabitationBehaviorScore = requiredScore(
-    row.cohabitation_behavior_score ?? row.cohabitation_tolerance_score,
-  );
   const cohabitationToleranceScore = requiredScore(row.cohabitation_tolerance_score);
 
   if (
@@ -358,7 +353,6 @@ function toMatchPreferences(row: PreferenceRecord): MatchPreferences | null {
     || guestToleranceScore === null
     || conflictBehaviorScore === null
     || conflictToleranceScore === null
-    || cohabitationBehaviorScore === null
     || cohabitationToleranceScore === null
   ) {
     return null;
@@ -395,7 +389,6 @@ function toMatchPreferences(row: PreferenceRecord): MatchPreferences | null {
     guestToleranceScore,
     conflictBehaviorScore,
     conflictToleranceScore,
-    cohabitationBehaviorScore,
     cohabitationToleranceScore,
   };
 }

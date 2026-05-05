@@ -4,8 +4,6 @@ from copy import deepcopy
 def _participant(**overrides):
     participant = {
         "user_id": "user-1",
-        "age": 24,
-        "gender": "woman",
         "preferences": {
             "smokes": False,
             "ok_with_smoking": False,
@@ -15,13 +13,9 @@ def _participant(**overrides):
             "ok_with_alcohol": True,
             "has_pets": False,
             "ok_with_pets": True,
-            "partner_stays_over": False,
-            "ok_with_partners_staying": True,
-            "shares_food": False,
-            "ok_with_coed": True,
+            "partner_stays_over": 1,
+            "ok_with_partners_staying": 2,
             "study_or_wfh": False,
-            "preferred_age_min": 21,
-            "preferred_age_max": 30,
             "budget_min": 1200,
             "budget_max": 1800,
             "move_in_date": "2026-06-01",
@@ -37,7 +31,6 @@ def _participant(**overrides):
             "guest_tolerance_score": 2,
             "conflict_behavior_score": 2,
             "conflict_tolerance_score": 2,
-            "cohabitation_behavior_score": 2,
             "cohabitation_tolerance_score": 2,
         },
     }
@@ -56,13 +49,15 @@ def test_matching_requires_auth(client):
 
 
 def test_matching_hard_filter_failure_returns_zero_score(client, make_token):
-    left = _participant()
+    left = _participant(preferences={"ok_with_pets": False})
     right = _participant(
         user_id="user-2",
-        gender="man",
         preferences={
             "smokes": True,
-            "ok_with_coed": False,
+            "uses_marijuana": True,
+            "drinks_alcohol": True,
+            "ok_with_alcohol": False,
+            "has_pets": True,
         },
     )
 
@@ -77,14 +72,15 @@ def test_matching_hard_filter_failure_returns_zero_score(client, make_token):
     assert body["passed_filters"] is False
     assert body["overall_score"] == 0.0
     assert "Smoking preference is not mutually compatible." in body["failures"]
-    assert "Coed living preference is not mutually compatible." in body["failures"]
+    assert "Marijuana preference is not mutually compatible." in body["failures"]
+    assert "Alcohol preference is not mutually compatible." in body["failures"]
+    assert "Pet preference is not mutually compatible." in body["failures"]
 
 
 def test_matching_returns_weighted_domain_breakdown(client, make_token):
     left = _participant()
     right = _participant(
         user_id="user-2",
-        age=26,
         preferences={
             "budget_min": 1400,
             "budget_max": 2000,
@@ -124,7 +120,7 @@ def test_matching_returns_weighted_domain_breakdown(client, make_token):
         "cohabitation",
         "conflict",
     }
-    assert set(body["subdomains"].keys()) == {"budget", "move_in", "food_sharing", "cleaning", "cooking"}
+    assert set(body["subdomains"].keys()) == {"budget", "move_in", "cleaning", "cooking"}
     assert body["filter_details"]["budget_overlap"] is True
     assert body["filter_details"]["move_in_compatible"] is True
     assert 0 < body["subdomains"]["budget"] < 1
@@ -132,45 +128,50 @@ def test_matching_returns_weighted_domain_breakdown(client, make_token):
     assert 0 < body["domains"]["logistics"] < 1
 
 
-def test_matching_boosts_noise_weight_for_work_from_home(client, make_token):
-    left = _participant(preferences={"study_or_wfh": True})
-    right = _participant(user_id="user-2", age=25)
+def test_matching_boosts_noise_weight_for_noise_sensitive_wfh(client, make_token):
+    left = _participant(preferences={"study_or_wfh": True, "noise_tolerance_score": 0})
+    right = _participant(user_id="user-2")
 
-    response = client.post(
+    body = client.post(
         "/matching/compatibility",
         json={"left": left, "right": right},
         headers={"Authorization": f"Bearer {make_token()}"},
-    )
+    ).json()
 
-    assert response.status_code == 200
-    body = response.json()
+    base_noise_weight = client.post(
+        "/matching/compatibility",
+        json={"left": _participant(), "right": right},
+        headers={"Authorization": f"Bearer {make_token()}"},
+    ).json()["weights"]["noise"]
+
     assert body["passed_filters"] is True
-    assert body["weights"]["noise"] > 0.15
+    assert body["weights"]["noise"] > base_noise_weight
 
 
-def test_matching_food_sharing_mismatch_is_soft_penalty(client, make_token):
-    left = _participant(preferences={"shares_food": False})
-    right = _participant(user_id="user-2", age=25, preferences={"shares_food": True})
+def test_matching_no_noise_boost_for_noise_tolerant_wfh(client, make_token):
+    left = _participant(preferences={"study_or_wfh": True, "noise_tolerance_score": 4})
+    right = _participant(user_id="user-2")
 
-    response = client.post(
+    body = client.post(
         "/matching/compatibility",
         json={"left": left, "right": right},
         headers={"Authorization": f"Bearer {make_token()}"},
-    )
+    ).json()
 
-    assert response.status_code == 200
-    body = response.json()
+    base_noise_weight = client.post(
+        "/matching/compatibility",
+        json={"left": _participant(), "right": right},
+        headers={"Authorization": f"Bearer {make_token()}"},
+    ).json()["weights"]["noise"]
+
     assert body["passed_filters"] is True
-    assert body["filter_details"]["food_sharing_compatible"] is False
-    assert body["subdomains"]["food_sharing"] == 0.5
-    assert body["failures"] == []
+    assert body["weights"]["noise"] == base_noise_weight
 
 
 def test_matching_threshold_score_penalizes_one_sided_severe_mismatch(client, make_token):
     left = _participant(preferences={"noise_behavior_score": 0, "noise_tolerance_score": 0})
     right = _participant(
         user_id="user-2",
-        age=25,
         preferences={"noise_behavior_score": 4, "noise_tolerance_score": 4},
     )
 
