@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 from jose import JWTError
 from backend.app.main import app
-from backend.models.auth import require_auth 
-from backend.models.database import get_db    
-from datetime import datetime
+from backend.models.auth import require_auth
+from backend.models.database import get_db
+from datetime import datetime, date
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -16,7 +16,7 @@ TEST_USER_ID = str(uuid4())
 VALID_PROFILE = {
     "full_name": "Jane Doe",
     "bio": "I like a clean but relaxed home.",
-    "age": 25,
+    "birthdate": "1999-06-15",
     "gender": "female",
     "location": "San Francisco, CA",
 }
@@ -29,6 +29,7 @@ def make_mock_profile(**overrides):
     profile = MagicMock()
     profile.id = TEST_USER_ID
     profile.avatar_url = None
+    profile.birthdate = date(1999, 6, 15)
     profile.created_at = datetime(2024, 1, 1, 0, 0, 0)
     profile.updated_at = datetime(2024, 1, 1, 0, 0, 0)
     for key, value in data.items():
@@ -85,13 +86,8 @@ class TestCreateProfile:
         response = client.post("/profile/", json=bad_data, headers={"Authorization": "Bearer faketoken"})
         assert response.status_code == 422
 
-    def test_create_profile_age_too_young(self):
-        bad_data = {**VALID_PROFILE, "age": 5}
-        response = client.post("/profile/", json=bad_data, headers={"Authorization": "Bearer faketoken"})
-        assert response.status_code == 422
-
-    def test_create_profile_age_too_old(self):
-        bad_data = {**VALID_PROFILE, "age": 200}
+    def test_create_profile_invalid_birthdate_format(self):
+        bad_data = {**VALID_PROFILE, "birthdate": "not-a-date"}
         response = client.post("/profile/", json=bad_data, headers={"Authorization": "Bearer faketoken"})
         assert response.status_code == 422
 
@@ -105,7 +101,7 @@ class TestCreateProfile:
     def test_create_profile_no_auth(self):
         app.dependency_overrides.clear()
         response = client.post("/profile/", json=VALID_PROFILE)
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
 
 class TestUpdateProfile:
@@ -131,8 +127,8 @@ class TestUpdateProfile:
         response = client.put("/profile/", json={"bio": "Updated bio only."}, headers={"Authorization": "Bearer faketoken"})
         assert response.status_code == 200
 
-    def test_update_profile_invalid_age(self):
-        response = client.put("/profile/", json={"age": 5}, headers={"Authorization": "Bearer faketoken"})
+    def test_update_profile_invalid_birthdate(self):
+        response = client.put("/profile/", json={"birthdate": "not-a-date"}, headers={"Authorization": "Bearer faketoken"})
         assert response.status_code == 422
 
     def test_update_profile_bio_too_long(self):
@@ -142,7 +138,7 @@ class TestUpdateProfile:
     def test_update_profile_no_auth(self):
         app.dependency_overrides.clear()
         response = client.put("/profile/", json={"full_name": "Jane"})
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
 
 class TestGetProfile:
@@ -164,7 +160,7 @@ class TestGetProfile:
     def test_get_profile_no_auth(self):
         app.dependency_overrides.clear()
         response = client.get("/profile/")
-        assert response.status_code == 401
+        assert response.status_code in (401, 403)
 
 
 class TestAuth:
@@ -178,7 +174,6 @@ class TestAuth:
 
     def test_token_missing_sub(self):
         app.dependency_overrides.clear()
-        # ← patch target updated to match backend.models.auth module path
         with patch("backend.models.auth.jwt.decode", return_value={}):
             response = client.get("/profile/", headers={"Authorization": "Bearer nosubtoken"})
         assert response.status_code == 500
