@@ -15,6 +15,8 @@ export type Screen = 'Login' | 'Register';
 type ProfileRecord = {
   avatar_url: string | null;
   birthdate: string | null;
+  full_name: string | null;
+  location: string | null;
   questionnaire_complete: boolean | null;
 };
 
@@ -165,7 +167,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('avatar_url, birthdate, questionnaire_complete')
+        .select('avatar_url, birthdate, full_name, location, questionnaire_complete')
         .eq('id', activeSession.user.id)
         .maybeSingle<ProfileRecord>();
 
@@ -184,7 +186,7 @@ export default function App() {
       }
 
       setOnboardingState({
-        needsBasicInfo: !data?.birthdate,
+        needsBasicInfo: !data?.birthdate || !data?.full_name?.trim() || !data?.location?.trim(),
         needsPhotoSetup: !data?.avatar_url,
         needsQuestionnaire: !data?.questionnaire_complete,
       });
