@@ -15,8 +15,7 @@ SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 
 if not SUPABASE_URL:
     pytest.skip("Supabase env vars not set — skipping integration tests", allow_module_level=True)
-
-
+    
 client = TestClient(app)
 
 TEST_EMAIL = "test@gmail.com"
