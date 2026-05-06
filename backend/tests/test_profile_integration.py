@@ -1,6 +1,6 @@
+import os
 import pytest
 import httpx
-import os
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 from backend.app.main import app
@@ -12,6 +12,10 @@ os.environ["SUPABASE_KEY"] = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY", "")
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+
+if not SUPABASE_URL:
+    pytest.skip("Supabase env vars not set — skipping integration tests", allow_module_level=True)
+
 
 client = TestClient(app)
 
