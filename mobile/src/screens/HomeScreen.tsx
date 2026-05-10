@@ -80,6 +80,8 @@ type RankedMatch = {
   domains: Record<DomainKey, number>;
 };
 
+type DiscoveryDecision = 'like' | 'dislike';
+
 const PRIMARY = '#4A90D9';
 const TEXT = '#111827';
 const MUTED = '#6B7280';
@@ -147,6 +149,8 @@ export default function HomeScreen() {
   const [profileSaveError, setProfileSaveError] = useState('');
   const [profileSaveMessage, setProfileSaveMessage] = useState('');
   const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(new Set());
+  const [savingDecision, setSavingDecision] = useState<DiscoveryDecision | null>(null);
+  const [decisionError, setDecisionError] = useState('');
 
   const markImageFailed = (url: string) => {
     setFailedImageUrls(current => new Set(current).add(url));
@@ -155,6 +159,7 @@ export default function HomeScreen() {
   const loadRankings = async () => {
     setLoadingMatches(true);
     setRankingError('');
+    setDecisionError('');
 
     try {
       const { data: authData, error: userError } = await supabase.auth.getUser();
@@ -181,8 +186,19 @@ export default function HomeScreen() {
         .select(PREFERENCE_COLUMNS);
       if (preferenceError) throw preferenceError;
 
+      const { data: decisionData, error: discoveryError } = await supabase
+        .from('discovery_decisions')
+        .select('target_user_id')
+        .eq('user_id', userId);
+      if (discoveryError) throw discoveryError;
+
       const profiles = (profileData ?? []) as ProfileRecord[];
       const preferences = (preferenceData ?? []) as unknown as PreferenceRecord[];
+      const decidedUserIds = new Set(
+        ((decisionData ?? []) as { target_user_id: string | null }[])
+          .map(row => row.target_user_id)
+          .filter((id): id is string => Boolean(id)),
+      );
       const preferencesByUser = new Map(preferences.map(row => [row.user_id, row]));
       const currentProfile = profiles.find(profile => profile.id === userId) ?? null;
       const currentPreferences = preferencesByUser.get(userId) ?? null;
@@ -213,7 +229,7 @@ export default function HomeScreen() {
 
       let skipped = 0;
       const ranked = profiles
-        .filter(profile => profile.id !== userId)
+        .filter(profile => profile.id !== userId && !decidedUserIds.has(profile.id))
         .map(profile => {
           const candidatePreferences = preferencesByUser.get(profile.id) ?? null;
           const candidate = toParticipant(profile, candidatePreferences);
@@ -371,6 +387,38 @@ export default function HomeScreen() {
     }
   };
 
+  const handleDiscoveryDecision = async (decision: DiscoveryDecision) => {
+    if (!topMatch || savingDecision) return;
+
+    setSavingDecision(decision);
+    setDecisionError('');
+
+    try {
+      const { data: authData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('No signed-in user found.');
+
+      const { error } = await supabase
+        .from('discovery_decisions')
+        .upsert({
+          user_id: userId,
+          target_user_id: topMatch.userId,
+          decision,
+        }, {
+          onConflict: 'user_id,target_user_id',
+        });
+      if (error) throw error;
+
+      setMatches(current => current.filter(match => match.userId !== topMatch.userId));
+    } catch (error) {
+      console.error('Could not save discovery decision', error);
+      setDecisionError('Could not save your choice. Please try again.');
+    } finally {
+      setSavingDecision(null);
+    }
+  };
+
   const topMatch = matches[0] ?? null;
 
   return (
@@ -435,11 +483,35 @@ export default function HomeScreen() {
                 </View>
 
                 <View style={styles.actionRow}>
-                  <TouchableOpacity style={[styles.roundAction, styles.rejectAction]} disabled>
-                    <Ionicons name="close" size={24} color="#B42318" />
+                  <TouchableOpacity
+                    style={[
+                      styles.roundAction,
+                      styles.rejectAction,
+                      savingDecision && styles.actionDisabled,
+                    ]}
+                    onPress={() => void handleDiscoveryDecision('dislike')}
+                    disabled={Boolean(savingDecision)}
+                  >
+                    {savingDecision === 'dislike' ? (
+                      <ActivityIndicator color="#B42318" />
+                    ) : (
+                      <Ionicons name="close" size={24} color="#B42318" />
+                    )}
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.roundAction, styles.acceptAction]} disabled>
-                    <Ionicons name="checkmark" size={24} color="#067647" />
+                  <TouchableOpacity
+                    style={[
+                      styles.roundAction,
+                      styles.acceptAction,
+                      savingDecision && styles.actionDisabled,
+                    ]}
+                    onPress={() => void handleDiscoveryDecision('like')}
+                    disabled={Boolean(savingDecision)}
+                  >
+                    {savingDecision === 'like' ? (
+                      <ActivityIndicator color="#067647" />
+                    ) : (
+                      <Ionicons name="checkmark" size={24} color="#067647" />
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -451,6 +523,8 @@ export default function HomeScreen() {
                 </Text>
               </View>
             )}
+
+            {decisionError ? <Text style={styles.authError}>{decisionError}</Text> : null}
 
             <View style={styles.feedMetaRow}>
               <Text style={styles.feedMetaText}>
@@ -966,6 +1040,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+  },
+  actionDisabled: {
+    opacity: 0.55,
   },
   rejectAction: {
     backgroundColor: '#FEEDEB',
