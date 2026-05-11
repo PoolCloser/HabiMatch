@@ -9,13 +9,9 @@ export type MatchPreferences = {
   okWithAlcohol: boolean;
   hasPets: boolean;
   okWithPets: boolean;
-  partnerStaysOver: boolean;
-  okWithPartnersStaying: boolean;
-  sharesFood: boolean;
-  okWithCoed: boolean;
+  partnerStaysOver: number;
+  okWithPartnersStaying: number;
   studyOrWfh: boolean;
-  preferredAgeMin: number;
-  preferredAgeMax: number;
   budgetMin: number;
   budgetMax: number;
   moveInDate: string;
@@ -31,7 +27,6 @@ export type MatchPreferences = {
   guestToleranceScore: number;
   conflictBehaviorScore: number;
   conflictToleranceScore: number;
-  cohabitationBehaviorScore: number;
   cohabitationToleranceScore: number;
 };
 
@@ -160,9 +155,14 @@ function booleanPairCompatible(
 
 function normalizedWeights(left: MatchParticipant, right: MatchParticipant): Record<DomainKey, number> {
   const weights = { ...BASE_DOMAIN_WEIGHTS };
-  if (left.preferences.studyOrWfh || right.preferences.studyOrWfh) {
-    weights.noise *= NOISE_WFH_MULTIPLIER;
-  }
+  const leftSensitivity = left.preferences.studyOrWfh
+    ? (SCORE_MAX - left.preferences.noiseToleranceScore) / SCORE_MAX
+    : 0;
+  const rightSensitivity = right.preferences.studyOrWfh
+    ? (SCORE_MAX - right.preferences.noiseToleranceScore) / SCORE_MAX
+    : 0;
+  const wfhSensitivity = Math.max(leftSensitivity, rightSensitivity);
+  weights.noise *= 1 + (NOISE_WFH_MULTIPLIER - 1) * wfhSensitivity;
 
   const total = DOMAIN_KEYS.reduce((sum, key) => sum + weights[key], 0);
   return DOMAIN_KEYS.reduce(
@@ -182,23 +182,10 @@ export function calculateCompatibility(
   const budgetOverlapRatio = overlapRatio(leftP.budgetMin, leftP.budgetMax, rightP.budgetMin, rightP.budgetMax);
   const gapDays = moveInGapDays(leftP.moveInDate, rightP.moveInDate);
   const moveInCompatible = gapDays <= MOVE_IN_MAX_GAP_DAYS;
-  const ageCompatible = (
-    rightP.preferredAgeMin <= left.age
-    && left.age <= rightP.preferredAgeMax
-    && leftP.preferredAgeMin <= right.age
-    && right.age <= leftP.preferredAgeMax
-  );
-
-  let coedCompatible = true;
-  if (left.gender && right.gender && left.gender !== right.gender) {
-    coedCompatible = leftP.okWithCoed && rightP.okWithCoed;
-  }
 
   const failures: string[] = [];
   if (!budgetOverlap) failures.push('Budget ranges do not overlap.');
   if (!moveInCompatible) failures.push('Move-in timelines are too far apart.');
-  if (!ageCompatible) failures.push('Age preferences are not mutually compatible.');
-  if (!coedCompatible) failures.push('Coed living preference is not mutually compatible.');
   if (!booleanPairCompatible(leftP.smokes, leftP.okWithSmoking, rightP.smokes, rightP.okWithSmoking)) {
     failures.push('Smoking preference is not mutually compatible.');
   }
@@ -211,9 +198,6 @@ export function calculateCompatibility(
   if (!booleanPairCompatible(leftP.hasPets, leftP.okWithPets, rightP.hasPets, rightP.okWithPets)) {
     failures.push('Pet preference is not mutually compatible.');
   }
-  if (!booleanPairCompatible(leftP.partnerStaysOver, leftP.okWithPartnersStaying, rightP.partnerStaysOver, rightP.okWithPartnersStaying)) {
-    failures.push('Overnight guest preference is not mutually compatible.');
-  }
 
   if (failures.length > 0) {
     return {
@@ -225,9 +209,8 @@ export function calculateCompatibility(
   }
 
   const logisticsScore = (
-    budgetOverlapRatio * 0.45
-    + moveInScore(gapDays) * 0.45
-    + (leftP.sharesFood === rightP.sharesFood ? 1 : 0.5) * 0.10
+    budgetOverlapRatio * 0.50
+    + moveInScore(gapDays) * 0.50
   );
   const sleepScore = thresholdScore(
     leftP.sleepBehaviorScore,
@@ -253,24 +236,26 @@ export function calculateCompatibility(
     rightP.noiseBehaviorScore,
     rightP.noiseToleranceScore,
   );
-  const guestsScore = thresholdScore(
+  const generalGuestsScore = thresholdScore(
     leftP.guestBehaviorScore,
     leftP.guestToleranceScore,
     rightP.guestBehaviorScore,
     rightP.guestToleranceScore,
   );
+  const overnightScore = thresholdScore(
+    leftP.partnerStaysOver,
+    leftP.okWithPartnersStaying,
+    rightP.partnerStaysOver,
+    rightP.okWithPartnersStaying,
+  );
+  const guestsScore = (generalGuestsScore + overnightScore) / 2;
   const conflictScore = pairedSimilarityScore(
     leftP.conflictBehaviorScore,
     leftP.conflictToleranceScore,
     rightP.conflictBehaviorScore,
     rightP.conflictToleranceScore,
   );
-  const cohabitationScore = pairedSimilarityScore(
-    leftP.cohabitationBehaviorScore,
-    leftP.cohabitationToleranceScore,
-    rightP.cohabitationBehaviorScore,
-    rightP.cohabitationToleranceScore,
-  );
+  const cohabitationScore = similarityScore(leftP.cohabitationToleranceScore, rightP.cohabitationToleranceScore);
 
   const domains: Record<DomainKey, number> = {
     logistics: round4(logisticsScore),

@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
+import { uploadProfilePhoto } from '../lib/profilePhotos';
 
 type Props = {
   userId: string;
@@ -51,10 +52,11 @@ export default function ProfilePhotoScreen({ userId, onComplete }: Props) {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: true,
     });
 
     if (!result.canceled) {
@@ -85,31 +87,8 @@ export default function ProfilePhotoScreen({ userId, onComplete }: Props) {
     setSaving(true);
 
     try {
-      const response = await fetch(selectedAsset.uri);
-      const imageBlob = await response.blob();
-      const fileExtension =
-        selectedAsset.fileName?.split('.').pop()?.toLowerCase()
-        ?? selectedAsset.mimeType?.split('/').pop()?.toLowerCase()
-        ?? 'jpg';
-      const contentType = selectedAsset.mimeType ?? imageBlob.type ?? 'image/jpeg';
-      const filePath = `${userId}/${Date.now()}.${fileExtension}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('profile-photos')
-        .upload(filePath, imageBlob, {
-          contentType,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('profile-photos')
-        .getPublicUrl(filePath);
-
-      await saveProfileAvatar(publicUrlData.publicUrl);
+      const avatarUrl = await uploadProfilePhoto(userId, selectedAsset);
+      await saveProfileAvatar(avatarUrl);
       onComplete();
     } catch (uploadFailure) {
       const detail =

@@ -9,6 +9,7 @@ node_modules/
 # Expo
 mobile/.expo/
 mobile/dist/
+supabase/.temp/
 
 # Python
 __pycache__/
