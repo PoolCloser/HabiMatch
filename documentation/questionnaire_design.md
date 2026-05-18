@@ -314,6 +314,3 @@ The backend returns:
 - `cleaning`
 - `cooking`
 
-## Notes on current implementation gaps
-
-- `move_in_date` is matched by date-gap threshold because the current questionnaire stores a single target date, not a true range
