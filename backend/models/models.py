@@ -1,10 +1,11 @@
-# models.py
+import uuid
+
 from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from backend.models.database import Base
-import uuid
 
 
 class Profile(Base):

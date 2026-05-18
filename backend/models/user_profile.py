@@ -1,18 +1,21 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from backend.models.database import get_db
 from backend.models.models import Profile
 from backend.models.schemas import ProfileCreate, ProfileUpdate, ProfileResponse
-from backend.models.auth import require_auth  # ← already correct, just keep this
-from uuid import UUID
+from backend.models.auth import require_auth
 
 router = APIRouter(tags=["Profile"])
+
 
 @router.post("/", response_model=ProfileResponse)
 def create_profile(
     profile_data: ProfileCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_auth)
+    current_user: dict = Depends(require_auth),
 ):
     user_id = UUID(current_user["sub"])
     existing = db.query(Profile).filter(Profile.id == user_id).first()
@@ -24,11 +27,12 @@ def create_profile(
     db.refresh(profile)
     return profile
 
+
 @router.put("/", response_model=ProfileResponse)
 def update_profile(
     profile_data: ProfileUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_auth)
+    current_user: dict = Depends(require_auth),
 ):
     user_id = UUID(current_user["sub"])
     profile = db.query(Profile).filter(Profile.id == user_id).first()
@@ -40,10 +44,11 @@ def update_profile(
     db.refresh(profile)
     return profile
 
+
 @router.get("/", response_model=ProfileResponse)
 def get_profile(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_auth)
+    current_user: dict = Depends(require_auth),
 ):
     user_id = UUID(current_user["sub"])
     profile = db.query(Profile).filter(Profile.id == user_id).first()
@@ -51,10 +56,11 @@ def get_profile(
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile
 
+
 @router.delete("/", status_code=204)
 def delete_profile(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_auth)
+    current_user: dict = Depends(require_auth),
 ):
     user_id = UUID(current_user["sub"])
     profile = db.query(Profile).filter(Profile.id == user_id).first()

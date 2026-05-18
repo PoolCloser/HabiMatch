@@ -1,17 +1,18 @@
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from fastapi import FastAPI, Depends
+
 from app.matching import CompatibilityRequest, CompatibilityResponse, calculate_compatibility
 from app.middleware.auth import require_auth
-
 from backend.models.user_profile import router as profile_router
-from backend.models.lifestyle import router as lifestyle_router  # ✅ ADD THIS
+from backend.models.lifestyle import router as lifestyle_router
 
 app = FastAPI(title="HabiMatch API")
 
 app.include_router(profile_router, prefix="/profile", tags=["profile"])
-app.include_router(lifestyle_router, prefix="/lifestyle", tags=["lifestyle"])  # ✅ ADD THIS
+app.include_router(lifestyle_router, prefix="/lifestyle", tags=["lifestyle"])
 
 
 @app.get("/health")
