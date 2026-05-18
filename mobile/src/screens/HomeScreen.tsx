@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -151,6 +152,13 @@ export default function HomeScreen() {
   const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(new Set());
   const [savingDecision, setSavingDecision] = useState<DiscoveryDecision | null>(null);
   const [decisionError, setDecisionError] = useState('');
+  const [mutualMatchUser, setMutualMatchUser] = useState<RankedMatch | null>(null);
+
+  const triggerMutualMatchNotification = (matchedUser: RankedMatch) => {
+    // US-301-A/B: write a row to the notifications table here once it exists,
+    // so the other user is also alerted when they next open the app.
+    setMutualMatchUser(matchedUser);
+  };
 
   const markImageFailed = (url: string) => {
     setFailedImageUrls(current => new Set(current).add(url));
@@ -410,6 +418,15 @@ export default function HomeScreen() {
         });
       if (error) throw error;
 
+      if (decision === 'like') {
+        const { data: isMutual, error: rpcError } = await supabase.rpc('check_mutual_match', {
+          target_user_id: topMatch.userId,
+        });
+        if (!rpcError && isMutual) {
+          triggerMutualMatchNotification(topMatch);
+        }
+      }
+
       setMatches(current => current.filter(match => match.userId !== topMatch.userId));
     } catch (error) {
       console.error('Could not save discovery decision', error);
@@ -654,6 +671,24 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+
+      <Modal visible={mutualMatchUser !== null} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Ionicons name="heart" size={36} color={PRIMARY} style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>It's a match!</Text>
+            <Text style={styles.modalBody}>
+              You and {mutualMatchUser ? displayName(mutualMatchUser) : ''} both liked each other.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalBtn}
+              onPress={() => setMutualMatchUser(null)}
+            >
+              <Text style={styles.modalBtnText}>Keep browsing</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.tabBar}>
         <TouchableOpacity style={styles.tabItem} disabled>
@@ -1280,5 +1315,53 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: PRIMARY,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  modalCard: {
+    backgroundColor: CARD,
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    width: '100%',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  modalIcon: {
+    marginBottom: 12,
+  },
+  modalTitle: {
+    color: TEXT,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  modalBody: {
+    color: MUTED,
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  modalBtn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 999,
+    paddingHorizontal: 28,
+    paddingVertical: 13,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalBtnText: {
+    color: CARD,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

@@ -6,12 +6,14 @@ from app.matching import CompatibilityRequest, CompatibilityResponse, calculate_
 from app.middleware.auth import require_auth
 
 from backend.models.user_profile import router as profile_router
-from backend.models.lifestyle import router as lifestyle_router  # ✅ ADD THIS
+from backend.models.lifestyle import router as lifestyle_router
+from backend.models.matches import router as matches_router
 
 app = FastAPI(title="HabiMatch API")
 
 app.include_router(profile_router, prefix="/profile", tags=["profile"])
-app.include_router(lifestyle_router, prefix="/lifestyle", tags=["lifestyle"])  # ✅ ADD THIS
+app.include_router(lifestyle_router, prefix="/lifestyle", tags=["lifestyle"])
+app.include_router(matches_router, prefix="/matches", tags=["matches"])
 
 
 @app.get("/health")

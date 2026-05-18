@@ -72,3 +72,13 @@ class LifestylePreferences(Base):
         back_populates="lifestyle_preferences",
         primaryjoin="foreign(LifestylePreferences.user_id) == Profile.id",
     )
+
+
+class DiscoveryDecision(Base):
+    __tablename__ = "discovery_decisions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
+    target_user_id = Column(UUID(as_uuid=True), nullable=False)
+    decision = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

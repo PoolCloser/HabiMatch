@@ -79,3 +79,16 @@ class LifestylePreferencesResponse(LifestylePreferencesBase):
 class FullProfileResponse(BaseModel):
     profile: ProfileResponse
     lifestyle: Optional[LifestylePreferencesResponse] = None
+
+
+class MatchedUser(BaseModel):
+    user_id: UUID
+    matched_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MutualMatchesResponse(BaseModel):
+    matches: list[MatchedUser]
+    total: int
