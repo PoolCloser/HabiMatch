@@ -31,15 +31,12 @@ const PLACEHOLDER =
 
 type Props = {
   conversationId: string;
-  otherUserId: string;
-  otherFullName: string | null;
-  otherAvatarUrl: string | null;
+  title: string;
+  subtitle: string;
+  avatarUrl: string | null;
+  isGroup: boolean;
   onBack: () => void;
 };
-
-function displayName(fullName: string | null, userId: string): string {
-  return fullName?.trim() || `User ${userId.slice(0, 8)}`;
-}
 
 function formatMessageTime(iso: string): string {
   const date = new Date(iso);
@@ -49,9 +46,10 @@ function formatMessageTime(iso: string): string {
 
 export default function ChatScreen({
   conversationId,
-  otherUserId,
-  otherFullName,
-  otherAvatarUrl,
+  title,
+  subtitle,
+  avatarUrl,
+  isGroup,
   onBack,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -63,9 +61,8 @@ export default function ChatScreen({
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  const title = displayName(otherFullName, otherUserId);
   const avatarUri =
-    otherAvatarUrl?.trim() || `${PLACEHOLDER}&name=${encodeURIComponent(title)}`;
+    avatarUrl?.trim() || `${PLACEHOLDER}&name=${encodeURIComponent(title)}`;
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => {
@@ -142,10 +139,16 @@ export default function ChatScreen({
         <TouchableOpacity onPress={onBack} style={styles.backBtn} accessibilityLabel="Back">
           <Ionicons name="chevron-back" size={24} color={TEXT} />
         </TouchableOpacity>
-        <Image source={{ uri: avatarUri }} style={styles.headerAvatar} />
+        {isGroup ? (
+          <View style={styles.headerGroupAvatar}>
+            <Ionicons name="people" size={20} color={PRIMARY} />
+          </View>
+        ) : (
+          <Image source={{ uri: avatarUri }} style={styles.headerAvatar} />
+        )}
         <View style={styles.headerText}>
           <Text style={styles.headerName}>{title}</Text>
-          <Text style={styles.headerMeta}>Mutual match</Text>
+          <Text style={styles.headerMeta}>{subtitle}</Text>
         </View>
       </View>
 
@@ -218,6 +221,14 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 6 },
   headerAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#eee' },
+  headerGroupAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerText: { flex: 1 },
   headerName: { color: TEXT, fontSize: 17, fontWeight: '700' },
   headerMeta: { color: MUTED, fontSize: 13, marginTop: 2 },
