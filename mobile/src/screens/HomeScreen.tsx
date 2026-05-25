@@ -13,6 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { uploadProfilePhoto } from '../lib/profilePhotos';
+import { checkMutualMatch } from '../lib/messaging';
+import MessagesScreen, { type ChatTarget } from './MessagesScreen';
+import ChatScreen from './ChatScreen';
 import {
   calculateCompatibility,
   type DomainKey,
@@ -87,7 +90,7 @@ const TEXT = '#111827';
 const MUTED = '#6B7280';
 const CARD = '#FFFFFF';
 
-type DashboardTab = 'feed' | 'profile';
+type DashboardTab = 'feed' | 'messages' | 'profile';
 const DOMAIN_LABELS: Record<DomainKey, string> = {
   logistics: 'Logistics',
   sleep: 'Sleep',
@@ -151,6 +154,8 @@ export default function HomeScreen() {
   const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(new Set());
   const [savingDecision, setSavingDecision] = useState<DiscoveryDecision | null>(null);
   const [decisionError, setDecisionError] = useState('');
+  const [mutualMatchNotice, setMutualMatchNotice] = useState<string | null>(null);
+  const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [genderFilter, setGenderFilter] = useState<'man' | 'woman' | null>(null);
   const [ageMin, setAgeMin] = useState('');
@@ -414,6 +419,13 @@ export default function HomeScreen() {
         });
       if (error) throw error;
 
+      if (decision === 'like') {
+        const isMutual = await checkMutualMatch(topMatch.userId);
+        if (isMutual) {
+          setMutualMatchNotice(`You matched with ${displayName(topMatch)}! Open Messages to chat.`);
+        }
+      }
+
       setMatches(current => current.filter(match => match.userId !== topMatch.userId));
     } catch (error) {
       console.error('Could not save discovery decision', error);
@@ -436,8 +448,25 @@ export default function HomeScreen() {
 
   const topMatch = filteredMatches[0] ?? null;
 
+  if (chatTarget) {
+    return (
+      <ChatScreen
+        conversationId={chatTarget.conversationId}
+        otherUserId={chatTarget.otherUserId}
+        otherFullName={chatTarget.otherFullName}
+        otherAvatarUrl={chatTarget.otherAvatarUrl}
+        onBack={() => setChatTarget(null)}
+      />
+    );
+  }
+
   return (
     <View style={styles.shell}>
+      {activeTab === 'messages' ? (
+        <View style={styles.messagesTabBody}>
+          <MessagesScreen onOpenChat={setChatTarget} />
+        </View>
+      ) : (
       <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
         {activeTab === 'feed' ? (
           <>
@@ -457,6 +486,17 @@ export default function HomeScreen() {
             </View>
 
             {rankingError ? <Text style={styles.errorBanner}>{rankingError}</Text> : null}
+            {mutualMatchNotice ? (
+              <TouchableOpacity
+                style={styles.matchNotice}
+                onPress={() => {
+                  setMutualMatchNotice(null);
+                  setActiveTab('messages');
+                }}
+              >
+                <Text style={styles.matchNoticeText}>{mutualMatchNotice}</Text>
+              </TouchableOpacity>
+            ) : null}
 
             {showFilters && (
               <View style={styles.filterPanel}>
@@ -725,15 +765,16 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+      )}
 
       <View style={styles.tabBar}>
-        <TouchableOpacity style={styles.tabItem} disabled>
-          <Ionicons name="chatbubble-outline" size={20} color={MUTED} />
-          <Text style={styles.tabText}>Messages</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('feed')}>
           <Ionicons name="albums-outline" size={20} color={activeTab === 'feed' ? PRIMARY : MUTED} />
           <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Feed</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('messages')}>
+          <Ionicons name="chatbubble-outline" size={20} color={activeTab === 'messages' ? PRIMARY : MUTED} />
+          <Text style={[styles.tabText, activeTab === 'messages' && styles.tabTextActive]}>Messages</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('profile')}>
           <Ionicons name="person-outline" size={20} color={activeTab === 'profile' ? PRIMARY : MUTED} />
@@ -993,6 +1034,12 @@ const styles = StyleSheet.create({
     paddingTop: 58,
     paddingBottom: 116,
   },
+  messagesTabBody: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 58,
+    paddingBottom: 96,
+  },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1175,6 +1222,20 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 14,
     fontSize: 13,
+  },
+  matchNotice: {
+    backgroundColor: '#ECFDF3',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#B7E4C7',
+    padding: 12,
+    marginBottom: 14,
+  },
+  matchNoticeText: {
+    color: '#067647',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   stateCard: {
     backgroundColor: CARD,
