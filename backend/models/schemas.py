@@ -1,8 +1,9 @@
-# schemas.py
-from pydantic import BaseModel, Field
+from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
-from datetime import date, datetime
+
+from pydantic import BaseModel, Field
+
 
 class ProfileBase(BaseModel):
     full_name: Optional[str] = None
@@ -18,7 +19,7 @@ class ProfileCreate(ProfileBase):
 
 
 class ProfileUpdate(ProfileBase):
-    pass  
+    pass
 
 
 class ProfileResponse(ProfileBase):
@@ -28,6 +29,7 @@ class ProfileResponse(ProfileBase):
 
     class Config:
         from_attributes = True
+
 
 class LifestylePreferencesBase(BaseModel):
     sleep_behavior_score: Optional[int] = Field(default=None, ge=1, le=10)
@@ -64,7 +66,7 @@ class LifestylePreferencesCreate(LifestylePreferencesBase):
 
 
 class LifestylePreferencesUpdate(LifestylePreferencesBase):
-    pass 
+    pass
 
 
 class LifestylePreferencesResponse(LifestylePreferencesBase):
@@ -75,6 +77,7 @@ class LifestylePreferencesResponse(LifestylePreferencesBase):
 
     class Config:
         from_attributes = True
+
 
 class FullProfileResponse(BaseModel):
     profile: ProfileResponse

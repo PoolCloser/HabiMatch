@@ -156,6 +156,10 @@ export default function HomeScreen() {
   const [decisionError, setDecisionError] = useState('');
   const [mutualMatchNotice, setMutualMatchNotice] = useState<string | null>(null);
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [genderFilter, setGenderFilter] = useState<'man' | 'woman' | null>(null);
+  const [ageMin, setAgeMin] = useState('');
+  const [ageMax, setAgeMax] = useState('');
 
   const markImageFailed = (url: string) => {
     setFailedImageUrls(current => new Set(current).add(url));
@@ -431,7 +435,18 @@ export default function HomeScreen() {
     }
   };
 
-  const topMatch = matches[0] ?? null;
+  const hasActiveFilters = genderFilter !== null || ageMin !== '' || ageMax !== '';
+
+  const filteredMatches = matches.filter(match => {
+    if (genderFilter && match.gender !== genderFilter) return false;
+    const parsedMin = parseInt(ageMin, 10);
+    const parsedMax = parseInt(ageMax, 10);
+    if (!isNaN(parsedMin) && match.age < parsedMin) return false;
+    if (!isNaN(parsedMax) && match.age > parsedMax) return false;
+    return true;
+  });
+
+  const topMatch = filteredMatches[0] ?? null;
 
   if (chatTarget) {
     return (
@@ -460,9 +475,13 @@ export default function HomeScreen() {
                 <Text style={styles.logo}>HM</Text>
                 <Text style={styles.screenTitle}>Roommate Feed</Text>
               </View>
-              <TouchableOpacity style={styles.iconTextBtn} disabled>
-                <Ionicons name="swap-vertical-outline" size={17} color={PRIMARY} />
-                <Text style={styles.iconText}>Sort</Text>
+              <TouchableOpacity
+                style={[styles.iconTextBtn, hasActiveFilters && styles.iconTextBtnActive]}
+                onPress={() => setShowFilters(v => !v)}
+                accessibilityLabel="Toggle filters"
+              >
+                <Ionicons name="options-outline" size={17} color={hasActiveFilters ? CARD : PRIMARY} />
+                <Text style={[styles.iconText, hasActiveFilters && styles.iconTextActive]}>Filter</Text>
               </TouchableOpacity>
             </View>
 
@@ -478,6 +497,51 @@ export default function HomeScreen() {
                 <Text style={styles.matchNoticeText}>{mutualMatchNotice}</Text>
               </TouchableOpacity>
             ) : null}
+
+            {showFilters && (
+              <View style={styles.filterPanel}>
+                <Text style={styles.filterSectionLabel}>Gender</Text>
+                <View style={styles.filterPillRow}>
+                  {(['man', 'woman'] as const).map(g => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[styles.filterPill, genderFilter === g && styles.filterPillActive]}
+                      onPress={() => setGenderFilter(genderFilter === g ? null : g)}
+                    >
+                      <Text style={[styles.filterPillText, genderFilter === g && styles.filterPillTextActive]}>
+                        {g.charAt(0).toUpperCase() + g.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.filterSectionLabel}>Age range</Text>
+                <View style={styles.ageRangeRow}>
+                  <TextInput
+                    style={styles.ageRangeInput}
+                    keyboardType="number-pad"
+                    placeholder="Min"
+                    placeholderTextColor="#9CA3AF"
+                    value={ageMin}
+                    onChangeText={v => setAgeMin(v.replace(/[^0-9]/g, ''))}
+                    onBlur={() => {
+                      const n = parseInt(ageMin, 10);
+                      if (!isNaN(n) && n < 18) setAgeMin('18');
+                    }}
+                    maxLength={3}
+                  />
+                  <Text style={styles.ageRangeSep}>–</Text>
+                  <TextInput
+                    style={styles.ageRangeInput}
+                    keyboardType="number-pad"
+                    placeholder="Max"
+                    placeholderTextColor="#9CA3AF"
+                    value={ageMax}
+                    onChangeText={v => setAgeMax(v.replace(/[^0-9]/g, ''))}
+                    maxLength={3}
+                  />
+                </View>
+              </View>
+            )}
 
             {loadingMatches ? (
               <View style={styles.stateCard}>
@@ -555,6 +619,11 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+            ) : matches.length > 0 ? (
+              <View style={styles.stateCard}>
+                <Text style={styles.emptyTitle}>No matches for filters</Text>
+                <Text style={styles.emptyText}>Try adjusting your age or gender filters.</Text>
+              </View>
             ) : (
               <View style={styles.stateCard}>
                 <Text style={styles.emptyTitle}>No matches yet</Text>
@@ -569,7 +638,9 @@ export default function HomeScreen() {
             <View style={styles.feedMetaRow}>
               <Text style={styles.feedMetaText}>
                 {matches.length > 0
-                  ? `${matches.length} ranked ${skippedCount > 0 ? `- ${skippedCount} incomplete skipped` : ''}`
+                  ? hasActiveFilters
+                    ? `${filteredMatches.length} of ${matches.length} shown`
+                    : `${matches.length} ranked${skippedCount > 0 ? ` - ${skippedCount} incomplete skipped` : ''}`
                   : 'Waiting for completed profiles'}
               </Text>
               <TouchableOpacity style={styles.refreshBtn} onPress={loadRankings} disabled={loadingMatches}>
@@ -1341,5 +1412,71 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: PRIMARY,
+  },
+  iconTextBtnActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  iconTextActive: {
+    color: CARD,
+  },
+  filterPanel: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E4EAF2',
+    padding: 16,
+    gap: 10,
+    marginBottom: 14,
+  },
+  filterSectionLabel: {
+    color: TEXT,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  filterPillRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterPill: {
+    borderWidth: 1,
+    borderColor: '#D8E6F5',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  filterPillActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+  },
+  filterPillText: {
+    color: PRIMARY,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  filterPillTextActive: {
+    color: CARD,
+  },
+  ageRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ageRangeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#D8E6F5',
+    borderRadius: 10,
+    backgroundColor: '#F9FBFD',
+    color: TEXT,
+    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlign: 'center',
+  },
+  ageRangeSep: {
+    color: MUTED,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

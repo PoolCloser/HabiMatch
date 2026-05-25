@@ -7,7 +7,8 @@ load_dotenv()
 
 DATABASE_URL = os.environ.get("SUPABASE_DB_URL")
 
-engine = create_engine(DATABASE_URL or "sqlite:///:memory:", echo=True)  # ← fallback so tests don't crash on import
+# Fallback to in-memory SQLite so tests don't crash on import when SUPABASE_DB_URL is unset.
+engine = create_engine(DATABASE_URL or "sqlite:///:memory:", echo=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

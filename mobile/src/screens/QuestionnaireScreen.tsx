@@ -294,8 +294,7 @@ const timeToScore = (date: Date): number => {
   return 4;
 };
 
-const defaultBedtime = new Date();
-defaultBedtime.setHours(23, 0, 0, 0);
+const defaultBedtime = new Date(2000, 0, 1, 23, 0, 0, 0);
 
 const EMPTY_ANSWERS: Answers = {
   ...Object.fromEntries(

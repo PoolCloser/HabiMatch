@@ -29,4 +29,4 @@ create policy "Users can update own discovery decisions"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-grant select, insert, update on table public.discovery_decisions to authenticated;;
+grant select, insert, update on table public.discovery_decisions to authenticated;

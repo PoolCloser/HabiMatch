@@ -1,5 +1,5 @@
-#auth.py
 import os
+
 import httpx
 from jose import jwt, JWTError
 from fastapi import Depends, HTTPException, status
