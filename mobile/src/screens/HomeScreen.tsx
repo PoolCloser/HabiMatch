@@ -452,9 +452,10 @@ export default function HomeScreen() {
     return (
       <ChatScreen
         conversationId={chatTarget.conversationId}
-        otherUserId={chatTarget.otherUserId}
-        otherFullName={chatTarget.otherFullName}
-        otherAvatarUrl={chatTarget.otherAvatarUrl}
+        title={chatTarget.title}
+        subtitle={chatTarget.subtitle}
+        avatarUrl={chatTarget.avatarUrl}
+        isGroup={chatTarget.isGroup}
         onBack={() => setChatTarget(null)}
       />
     );
