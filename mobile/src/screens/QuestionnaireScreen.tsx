@@ -377,31 +377,15 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
   const progressPct = ((step + 1) / effectiveSteps.length) * 100;
   const isLast = step === effectiveSteps.length - 1;
 
-  const handleSelect = (value: string) => {
-    const field = (current as OptionsStep).field;
-    const updates: Partial<Answers> = { [field]: value };
-    const toleranceField = SKIP_IF_YES[field];
-    if (toleranceField) {
-      updates[toleranceField] = value === 'yes' ? 'yes' : '';
-    }
-    setAnswers(prev => ({ ...prev, ...updates }));
-  };
-
-  const handleNext = async () => {
-    if (!isComplete) return;
-    if (!isLast) {
-      setStep(s => s + 1);
-      return;
-    }
-
+  const handleSave = async (answersToSave: Answers) => {
     setSaving(true);
     setError('');
 
     try {
-      const yesNo = (k: AnswerKey) => answers[k] === 'yes';
-      const score = (k: AnswerKey) => parseInt(answers[k], 10);
+      const yesNo = (k: AnswerKey) => answersToSave[k] === 'yes';
+      const score = (k: AnswerKey) => parseInt(answersToSave[k], 10);
       const moveInDate = new Date();
-      moveInDate.setDate(moveInDate.getDate() + (MOVE_IN_DAYS[answers.move_in] ?? 90));
+      moveInDate.setDate(moveInDate.getDate() + (MOVE_IN_DAYS[answersToSave.move_in] ?? 90));
 
       const payload = {
         user_id: userId,
@@ -416,8 +400,8 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
         partner_stays_over: score('partner_stays_over'),
         ok_with_partners_staying: score('ok_with_partners_staying'),
         study_or_wfh: yesNo('study_or_wfh'),
-        budget_min: parseInt(answers.budget_min, 10),
-        budget_max: parseInt(answers.budget_max, 10),
+        budget_min: parseInt(answersToSave.budget_min, 10),
+        budget_max: parseInt(answersToSave.budget_max, 10),
         move_in_date: moveInDate.toISOString().split('T')[0],
         sleep_behavior_score: score('sleep_behavior_score'),
         sleep_tolerance_score: score('sleep_tolerance_score'),
@@ -464,6 +448,32 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSelect = (value: string) => {
+    const field = (current as OptionsStep).field;
+    const updates: Partial<Answers> = { [field]: value };
+    const toleranceField = SKIP_IF_YES[field];
+    if (toleranceField) {
+      updates[toleranceField] = value === 'yes' ? 'yes' : '';
+    }
+    const newAnswers = { ...answers, ...updates };
+    setAnswers(newAnswers);
+
+    if (!isLast) {
+      setStep(s => s + 1);
+    } else {
+      handleSave(newAnswers);
+    }
+  };
+
+  const handleNext = async () => {
+    if (!isComplete) return;
+    if (!isLast) {
+      setStep(s => s + 1);
+      return;
+    }
+    handleSave(answers);
   };
 
   const selected = !isBudgetStep ? answers[(current as OptionsStep).field] : '';
@@ -556,17 +566,23 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
                 <Text style={styles.backBtnText}>Back</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={[styles.nextBtn, (!isComplete || saving) && styles.nextBtnDisabled]}
-              onPress={handleNext}
-              disabled={!isComplete || saving}
-            >
-              {saving ? (
+            {(isBudgetStep || isTimePickerStep) ? (
+              <TouchableOpacity
+                style={[styles.nextBtn, (!isComplete || saving) && styles.nextBtnDisabled]}
+                onPress={handleNext}
+                disabled={!isComplete || saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.nextBtnText}>{isLast ? 'Finish' : 'Next'}</Text>
+                )}
+              </TouchableOpacity>
+            ) : saving ? (
+              <View style={[styles.nextBtn, styles.nextBtnDisabled]}>
                 <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.nextBtnText}>{isLast ? 'Finish' : 'Next'}</Text>
-              )}
-            </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         </View>
       </ScrollView>
