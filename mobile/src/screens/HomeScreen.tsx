@@ -44,7 +44,6 @@ type PreferenceRecord = {
   drinks_alcohol: boolean | null;
   ok_with_alcohol: boolean | null;
   has_pets: boolean | null;
-  ok_with_pets: boolean | null;
   partner_stays_over: number | null;
   ok_with_partners_staying: number | null;
   study_or_wfh: boolean | null;
@@ -74,6 +73,10 @@ type RankedMatch = {
   location: string | null;
   age: number;
   gender: Gender;
+  smokes: boolean;
+  usesMarijuana: boolean;
+  drinksAlcohol: boolean;
+  hasPets: boolean;
   budgetMin: number;
   budgetMax: number;
   moveInDate: string;
@@ -110,7 +113,6 @@ const PREFERENCE_COLUMNS = [
   'drinks_alcohol',
   'ok_with_alcohol',
   'has_pets',
-  'ok_with_pets',
   'partner_stays_over',
   'ok_with_partners_staying',
   'study_or_wfh',
@@ -131,8 +133,6 @@ const PREFERENCE_COLUMNS = [
   'conflict_tolerance_score',
   'cohabitation_tolerance_score',
 ].join(',');
-
-const MATCH_LIMIT = 8;
 
 export default function HomeScreen() {
   const [signingOut, setSigningOut] = useState(false);
@@ -160,6 +160,10 @@ export default function HomeScreen() {
   const [genderFilter, setGenderFilter] = useState<'man' | 'woman' | null>(null);
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
+  const [hideSmokers, setHideSmokers] = useState(false);
+  const [hideMarijuanaUsers, setHideMarijuanaUsers] = useState(false);
+  const [hideAlcoholUsers, setHideAlcoholUsers] = useState(false);
+  const [hidePetOwners, setHidePetOwners] = useState(false);
 
   const markImageFailed = (url: string) => {
     setFailedImageUrls(current => new Set(current).add(url));
@@ -261,8 +265,7 @@ export default function HomeScreen() {
             return left.passedFilters ? -1 : 1;
           }
           return right.score - left.score;
-        })
-        .slice(0, MATCH_LIMIT);
+        });
 
       setMatches(ranked);
       setSkippedCount(skipped);
@@ -435,10 +438,21 @@ export default function HomeScreen() {
     }
   };
 
-  const hasActiveFilters = genderFilter !== null || ageMin !== '' || ageMax !== '';
+  const hasActiveFilters =
+    genderFilter !== null ||
+    ageMin !== '' ||
+    ageMax !== '' ||
+    hideSmokers ||
+    hideMarijuanaUsers ||
+    hideAlcoholUsers ||
+    hidePetOwners;
 
   const filteredMatches = matches.filter(match => {
     if (genderFilter && match.gender !== genderFilter) return false;
+    if (hideSmokers && match.smokes) return false;
+    if (hideMarijuanaUsers && match.usesMarijuana) return false;
+    if (hideAlcoholUsers && match.drinksAlcohol) return false;
+    if (hidePetOwners && match.hasPets) return false;
     const parsedMin = parseInt(ageMin, 10);
     const parsedMax = parseInt(ageMax, 10);
     if (!isNaN(parsedMin) && match.age < parsedMin) return false;
@@ -541,6 +555,41 @@ export default function HomeScreen() {
                     maxLength={3}
                   />
                 </View>
+                <Text style={styles.filterSectionLabel}>Lifestyle</Text>
+                <View style={styles.filterPillRow}>
+                  <TouchableOpacity
+                    style={[styles.filterPill, hideSmokers && styles.filterPillActive]}
+                    onPress={() => setHideSmokers(value => !value)}
+                  >
+                    <Text style={[styles.filterPillText, hideSmokers && styles.filterPillTextActive]}>
+                      No cigarettes
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.filterPill, hideMarijuanaUsers && styles.filterPillActive]}
+                    onPress={() => setHideMarijuanaUsers(value => !value)}
+                  >
+                    <Text style={[styles.filterPillText, hideMarijuanaUsers && styles.filterPillTextActive]}>
+                      No marijuana
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.filterPill, hideAlcoholUsers && styles.filterPillActive]}
+                    onPress={() => setHideAlcoholUsers(value => !value)}
+                  >
+                    <Text style={[styles.filterPillText, hideAlcoholUsers && styles.filterPillTextActive]}>
+                      No alcohol at home
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.filterPill, hidePetOwners && styles.filterPillActive]}
+                    onPress={() => setHidePetOwners(value => !value)}
+                  >
+                    <Text style={[styles.filterPillText, hidePetOwners && styles.filterPillTextActive]}>
+                      No pets
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -579,6 +628,7 @@ export default function HomeScreen() {
 
                 <View style={styles.infoStack}>
                   <InfoRow label="Bio" value={topMatch.bio?.trim() || 'Bio not shown yet.'} />
+                  <InfoRow label="Lifestyle" value={formatLifestyle(topMatch)} />
                   <InfoRow label="Budget" value={formatBudget(topMatch.budgetMin, topMatch.budgetMax)} />
                   <InfoRow label="Move-in date" value={formatDate(topMatch.moveInDate)} />
                   <InfoRow
@@ -623,7 +673,7 @@ export default function HomeScreen() {
             ) : matches.length > 0 ? (
               <View style={styles.stateCard}>
                 <Text style={styles.emptyTitle}>No matches for filters</Text>
-                <Text style={styles.emptyText}>Try adjusting your age or gender filters.</Text>
+                <Text style={styles.emptyText}>Try adjusting your age, gender, or lifestyle filters.</Text>
               </View>
             ) : (
               <View style={styles.stateCard}>
@@ -858,13 +908,9 @@ function toMatchPreferences(row: PreferenceRecord): MatchPreferences | null {
 
   return {
     smokes: optionalBoolean(row.smokes, false),
-    okWithSmoking: optionalBoolean(row.ok_with_smoking, false),
     usesMarijuana: optionalBoolean(row.uses_marijuana, false),
-    okWithMarijuana: optionalBoolean(row.ok_with_marijuana, false),
     drinksAlcohol: optionalBoolean(row.drinks_alcohol, false),
-    okWithAlcohol: optionalBoolean(row.ok_with_alcohol, true),
     hasPets: optionalBoolean(row.has_pets, false),
-    okWithPets: optionalBoolean(row.ok_with_pets, true),
     partnerStaysOver,
     okWithPartnersStaying,
     studyOrWfh: optionalBoolean(row.study_or_wfh, false),
@@ -906,6 +952,10 @@ function toRankedProfile(
     location: profile.location,
     age: participant.age,
     gender: participant.gender,
+    smokes: participant.preferences.smokes,
+    usesMarijuana: participant.preferences.usesMarijuana,
+    drinksAlcohol: participant.preferences.drinksAlcohol,
+    hasPets: participant.preferences.hasPets,
     budgetMin: preferences.budget_min ?? 0,
     budgetMax: preferences.budget_max ?? 0,
     moveInDate: preferences.move_in_date ?? '',
@@ -987,6 +1037,19 @@ function displayProfileInitial(profile: ProfileRecord): string {
 function formatBudget(min: number, max: number): string {
   if (!min || !max) return 'Budget not shown';
   return `$${min.toLocaleString()} - $${max.toLocaleString()}`;
+}
+
+function formatYesNo(value: boolean): string {
+  return value ? 'Yes' : 'No';
+}
+
+function formatLifestyle(match: RankedMatch): string {
+  return [
+    `Cigarettes: ${formatYesNo(match.smokes)}`,
+    `Marijuana: ${formatYesNo(match.usesMarijuana)}`,
+    `Alcohol at home: ${formatYesNo(match.drinksAlcohol)}`,
+    `Pets: ${formatYesNo(match.hasPets)}`,
+  ].join(' - ');
 }
 
 function formatDate(value: string): string {
@@ -1437,6 +1500,7 @@ const styles = StyleSheet.create({
   },
   filterPillRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   filterPill: {

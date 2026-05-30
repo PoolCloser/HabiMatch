@@ -14,7 +14,7 @@ HabiMatch currently uses:
 - Name things after the domain concept they represent.
 - Avoid unrelated refactors in feature or bug-fix changes.
 - Keep formatting consistent with nearby code.
-- Use comments sparingly. Add comments only when they explain non-obvious reasoning, constraints, or business rules.
+- Use comments sparingly. Add comments only when they explain non-obvious reasoning, constraints, or rules.
 - Do not commit secrets, API keys, local environment files, generated caches, or build artifacts.
 - Treat tests as part of the implementation. Add or update tests when behavior changes.
 
@@ -24,7 +24,7 @@ HabiMatch currently uses:
 - Keep reusable mobile helpers and service wrappers in `mobile/src/lib/`.
 - Keep backend route and app wiring in `backend/app/`.
 - Keep backend domain models, schemas, and API routers in `backend/models/`.
-- Keep backend tests in `backend/tests/`.
+- Keep backend tests in `backend/tests/` and frontend tests in `frontend/tests/` respectively.
 - Keep Supabase schema and policy changes in timestamped files under `supabase/migrations/`.
 - Prefer one focused responsibility per file. Split files when unrelated concerns start accumulating.
 
