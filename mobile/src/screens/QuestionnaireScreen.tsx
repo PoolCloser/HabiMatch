@@ -8,7 +8,6 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { supabase } from '../lib/supabase';
 
 type Props = {
@@ -19,10 +18,10 @@ type Props = {
 const PRIMARY = '#4A90D9';
 
 type AnswerKey =
-  | 'smokes' | 'ok_with_smoking'
-  | 'uses_marijuana' | 'ok_with_marijuana'
-  | 'drinks_alcohol' | 'ok_with_alcohol'
-  | 'has_pets' | 'ok_with_pets'
+  | 'smokes'
+  | 'uses_marijuana'
+  | 'drinks_alcohol'
+  | 'has_pets'
   | 'partner_stays_over' | 'ok_with_partners_staying'
   | 'study_or_wfh' | 'budget_min' | 'budget_max' | 'move_in'
   | 'sleep_behavior_score' | 'sleep_tolerance_score'
@@ -48,26 +47,12 @@ type BudgetStep = {
   question: string;
 };
 
-type TimePickerStep = {
-  type: 'time_picker';
-  category: string;
-  question: string;
-  field: AnswerKey;
-};
-
-type Step = OptionsStep | BudgetStep | TimePickerStep;
+type Step = OptionsStep | BudgetStep;
 
 const YES_NO = [
   { label: 'Yes', value: 'yes' },
   { label: 'No', value: 'no' },
 ];
-
-// If the user does this behavior themselves, skip the tolerance question and auto-set it to 'yes'.
-const SKIP_IF_YES: Partial<Record<AnswerKey, AnswerKey>> = {
-  smokes: 'ok_with_smoking',
-  uses_marijuana: 'ok_with_marijuana',
-  drinks_alcohol: 'ok_with_alcohol',
-};
 
 const STEPS: Step[] = [
   // Logistics filters first — hard mismatches caught before anything else.
@@ -86,24 +71,26 @@ const STEPS: Step[] = [
 
   // Yes/no dealbreakers.
   { category: 'Lifestyle', question: 'Do you smoke cigarettes?', field: 'smokes', options: YES_NO },
-  { category: 'Lifestyle', question: 'Are you OK living with a smoker?', field: 'ok_with_smoking', options: YES_NO },
   { category: 'Lifestyle', question: 'Do you use marijuana?', field: 'uses_marijuana', options: YES_NO },
-  { category: 'Lifestyle', question: 'Are you OK living with someone who uses marijuana?', field: 'ok_with_marijuana', options: YES_NO },
-  { category: 'Lifestyle', question: 'Do you drink alcohol at home?', field: 'drinks_alcohol', options: YES_NO },
-  { category: 'Lifestyle', question: 'Are you OK living with someone who drinks at home?', field: 'ok_with_alcohol', options: YES_NO },
+  { category: 'Lifestyle', question: 'Do you drink alcohol?', field: 'drinks_alcohol', options: YES_NO },
   { category: 'Home Life', question: 'Do you have pets?', field: 'has_pets', options: YES_NO },
-  { category: 'Home Life', question: 'Is it OK if a housemate has pets?', field: 'ok_with_pets', options: YES_NO },
 
   // Sleep — grouped with WFH and noise since they're all about schedule and environment.
   {
-    type: 'time_picker',
     category: 'Sleep & Schedule',
     question: 'What time do you usually fall asleep on a weeknight?',
     field: 'sleep_behavior_score',
+    options: [
+      { label: 'Before 10:00 PM', value: '0' },
+      { label: '10:00-10:59 PM', value: '1' },
+      { label: '11:00-11:59 PM', value: '2' },
+      { label: '12:00-12:59 AM', value: '3' },
+      { label: '1:00 AM or later', value: '4' },
+    ],
   },
   {
     category: 'Sleep & Schedule',
-    question: 'How bothered are you if a roommate is making noise at 1am?',
+    question: 'How bothered are you if a roommate is making noise at 1 AM?',
     field: 'sleep_tolerance_score',
     options: [
       { label: "Very bothered - I can't sleep through it", value: '0' },
@@ -285,26 +272,14 @@ const MOVE_IN_DAYS: Record<string, number> = {
   '6plus': 365,
 };
 
-const timeToScore = (date: Date): number => {
-  const h = date.getHours();
-  if (h >= 5 && h < 22) return 0;
-  if (h === 22) return 1;
-  if (h === 23) return 2;
-  if (h === 0) return 3;
-  return 4;
-};
-
-const defaultBedtime = new Date(2000, 0, 1, 23, 0, 0, 0);
-
 const EMPTY_ANSWERS: Answers = {
   ...Object.fromEntries(
     STEPS
       .filter((s): s is OptionsStep =>
-        s.type !== 'budget_range' && s.type !== 'time_picker',
+        s.type !== 'budget_range',
       )
       .map(s => [s.field, '']),
   ),
-  sleep_behavior_score: String(timeToScore(defaultBedtime)),
   budget_min: '',
   budget_max: '',
 } as Answers;
@@ -340,42 +315,19 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
   const [answers, setAnswers] = useState<Answers>(EMPTY_ANSWERS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [timePickerDate, setTimePickerDate] = useState(defaultBedtime);
 
-  const skippedFields = new Set(
-    (Object.entries(SKIP_IF_YES) as [AnswerKey, AnswerKey][])
-      .filter(([behaviorField]) => answers[behaviorField] === 'yes')
-      .map(([, toleranceField]) => toleranceField),
-  );
-
-  const effectiveSteps = STEPS.filter(
-    s =>
-      s.type === 'budget_range' ||
-      s.type === 'time_picker' ||
-      !skippedFields.has((s as OptionsStep).field),
-  );
-
-  const current = effectiveSteps[step];
+  const current = STEPS[step];
   const isBudgetStep = current.type === 'budget_range';
-  const isTimePickerStep = current.type === 'time_picker';
   const budgetValid =
     answers.budget_min !== '' &&
     answers.budget_max !== '' &&
     Number(answers.budget_max) >= Number(answers.budget_min);
   const isComplete = isBudgetStep
     ? budgetValid
-    : isTimePickerStep
-      ? true
-      : Boolean(answers[(current as OptionsStep).field]);
+    : Boolean(answers[(current as OptionsStep).field]);
 
-  const handleTimeChange = (_: DateTimePickerEvent, date?: Date) => {
-    if (!date) return;
-    setTimePickerDate(date);
-    setAnswers(prev => ({ ...prev, sleep_behavior_score: String(timeToScore(date)) }));
-  };
-
-  const progressPct = ((step + 1) / effectiveSteps.length) * 100;
-  const isLast = step === effectiveSteps.length - 1;
+  const progressPct = ((step + 1) / STEPS.length) * 100;
+  const isLast = step === STEPS.length - 1;
 
   const handleSave = async (answersToSave: Answers) => {
     setSaving(true);
@@ -390,13 +342,9 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
       const payload = {
         user_id: userId,
         smokes: yesNo('smokes'),
-        ok_with_smoking: yesNo('ok_with_smoking'),
         uses_marijuana: yesNo('uses_marijuana'),
-        ok_with_marijuana: yesNo('ok_with_marijuana'),
         drinks_alcohol: yesNo('drinks_alcohol'),
-        ok_with_alcohol: yesNo('ok_with_alcohol'),
         has_pets: yesNo('has_pets'),
-        ok_with_pets: yesNo('ok_with_pets'),
         partner_stays_over: score('partner_stays_over'),
         ok_with_partners_staying: score('ok_with_partners_staying'),
         study_or_wfh: yesNo('study_or_wfh'),
@@ -452,12 +400,7 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
 
   const handleSelect = (value: string) => {
     const field = (current as OptionsStep).field;
-    const updates: Partial<Answers> = { [field]: value };
-    const toleranceField = SKIP_IF_YES[field];
-    if (toleranceField) {
-      updates[toleranceField] = value === 'yes' ? 'yes' : '';
-    }
-    const newAnswers = { ...answers, ...updates };
+    const newAnswers = { ...answers, [field]: value };
     setAnswers(newAnswers);
 
     if (!isLast) {
@@ -493,15 +436,7 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
           <Text style={styles.category}>{current.category}</Text>
           <Text style={styles.question}>{current.question}</Text>
 
-          {isTimePickerStep ? (
-            <DateTimePicker
-              value={timePickerDate}
-              mode="time"
-              display="spinner"
-              onChange={handleTimeChange}
-              style={styles.timePicker}
-            />
-          ) : isBudgetStep ? (
+          {isBudgetStep ? (
             <View style={styles.budgetRow}>
               <View style={styles.budgetField}>
                 <Text style={styles.budgetLabel}>Minimum</Text>
@@ -566,7 +501,7 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
                 <Text style={styles.backBtnText}>Back</Text>
               </TouchableOpacity>
             )}
-            {(isBudgetStep || isTimePickerStep) ? (
+            {isBudgetStep ? (
               <TouchableOpacity
                 style={[styles.nextBtn, (!isComplete || saving) && styles.nextBtnDisabled]}
                 onPress={handleNext}
@@ -639,7 +574,6 @@ const styles = StyleSheet.create({
   optionSelected: { borderColor: PRIMARY, backgroundColor: '#EDF4FC' },
   optionText: { fontSize: 15, color: '#444' },
   optionTextSelected: { color: PRIMARY, fontWeight: '600' },
-  timePicker: { width: '100%' },
   budgetRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
   budgetField: { flex: 1 },
   budgetLabel: { fontSize: 12, fontWeight: '600', color: '#666', marginBottom: 8 },

@@ -22,13 +22,13 @@ BASE_DOMAIN_WEIGHTS = {
 
 class MatchPreferences(BaseModel):
     smokes: bool
-    ok_with_smoking: bool
+    ok_with_smoking: bool | None = None
     uses_marijuana: bool
-    ok_with_marijuana: bool
+    ok_with_marijuana: bool | None = None
     drinks_alcohol: bool
-    ok_with_alcohol: bool
+    ok_with_alcohol: bool | None = None
     has_pets: bool
-    ok_with_pets: bool
+    ok_with_pets: bool | None = None
     partner_stays_over: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
     ok_with_partners_staying: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
     study_or_wfh: bool
@@ -134,19 +134,6 @@ def _move_in_score(gap_days: int) -> float:
     return _clamp_unit(1 - (gap_days / MOVE_IN_MAX_GAP_DAYS))
 
 
-def _boolean_pair_compatible(
-    left_behavior: bool,
-    left_tolerance: bool,
-    right_behavior: bool,
-    right_tolerance: bool,
-) -> bool:
-    if left_behavior and not right_tolerance:
-        return False
-    if right_behavior and not left_tolerance:
-        return False
-    return True
-
-
 def _build_filter_details(left: MatchParticipant, right: MatchParticipant) -> FilterDetails:
     left_p = left.preferences
     right_p = right.preferences
@@ -166,30 +153,10 @@ def _build_filter_details(left: MatchParticipant, right: MatchParticipant) -> Fi
         move_in_compatible=move_in_compatible,
         move_in_gap_days=move_in_gap_days,
         move_in_score=round(move_in_score, 4),
-        smoking_compatible=_boolean_pair_compatible(
-            left_p.smokes,
-            left_p.ok_with_smoking,
-            right_p.smokes,
-            right_p.ok_with_smoking,
-        ),
-        marijuana_compatible=_boolean_pair_compatible(
-            left_p.uses_marijuana,
-            left_p.ok_with_marijuana,
-            right_p.uses_marijuana,
-            right_p.ok_with_marijuana,
-        ),
-        alcohol_compatible=_boolean_pair_compatible(
-            left_p.drinks_alcohol,
-            left_p.ok_with_alcohol,
-            right_p.drinks_alcohol,
-            right_p.ok_with_alcohol,
-        ),
-        pets_compatible=_boolean_pair_compatible(
-            left_p.has_pets,
-            left_p.ok_with_pets,
-            right_p.has_pets,
-            right_p.ok_with_pets,
-        ),
+        smoking_compatible=True,
+        marijuana_compatible=True,
+        alcohol_compatible=True,
+        pets_compatible=True,
     )
 
 
@@ -199,14 +166,6 @@ def _filter_failures(details: FilterDetails) -> list[str]:
         failures.append("Budget ranges do not overlap.")
     if not details.move_in_compatible:
         failures.append("Move-in timelines are too far apart.")
-    if not details.smoking_compatible:
-        failures.append("Smoking preference is not mutually compatible.")
-    if not details.marijuana_compatible:
-        failures.append("Marijuana preference is not mutually compatible.")
-    if not details.alcohol_compatible:
-        failures.append("Alcohol preference is not mutually compatible.")
-    if not details.pets_compatible:
-        failures.append("Pet preference is not mutually compatible.")
     return failures
 
 

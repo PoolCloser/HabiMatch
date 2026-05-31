@@ -24,10 +24,9 @@ A change is done only when all applicable items below are true:
 - Any unclear requirement was resolved before implementation or documented as
   an explicit assumption in the pull request.
 - The change is scoped to the intended behavior and does not include unrelated
-  refactors, formatting churn, generated files, secrets, local environment
+  refactors, generated files, secrets, local environment
   files, caches, or build artifacts.
-- Code follows `documentation/style_guide.md` and the conventions already used
-  in nearby files.
+- Code follows `documentation/style_guide.md`.
 - New or changed behavior is covered by the right level of testing.
 - Existing tests and relevant manual checks pass.
 - User-facing behavior has clear loading, empty, disabled, validation, and

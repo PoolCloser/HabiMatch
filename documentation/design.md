@@ -1,7 +1,7 @@
 # HabiMatch Product Design Document
 
 **Product:** HabiMatch 1.0  
-**Author:** Koa Wolfe, Product Owner  
+**Author:** Koa Wolfe -- Product Owner  
 **Release target:** June 2, 2026  
 **Last revised:** May 18, 2026
 
@@ -14,34 +14,9 @@ create an account, complete onboarding, answer the questionnaire, review ranked
 roommate cards, save discovery decisions, receive mutual-match notifications,
 and message matches.
 
-This document was written by the Product Owner for the direction of the engineering
+This document was written for the direction of the engineering
 team. It defines the MVP feature scope, user flows, screen-level expectations,
 and product rules that should guide implementation.
-
-## Source of Truth
-
-The release plan describes the original roadmap. When this document and the
-release plan diverge, the currently implemented HabiMatch feature set supersedes
-the release plan.
-
-Current pre-1.0 implementation notes:
-
-- Messaging, mutual match notifications, and group chat are not implemented yet,
-  but they remain planned for the HabiMatch 1.0 release.
-- The Messages tab currently exists as a disabled placeholder until chat work is
-  implemented.
-- The mobile app currently reads and writes Supabase directly for profile,
-  questionnaire, feed, and discovery-decision behavior.
-- The backend contains protected profile and lifestyle routes plus the
-  authoritative Python matching implementation, but the current mobile feed uses
-  a TypeScript mirror in `mobile/src/lib/matching.ts` for client-side ranking.
-- The current code may still contain legacy substance-tolerance fields such as
-  `ok_with_smoking`, `ok_with_marijuana`, and `ok_with_alcohol`. The 1.0 design
-  direction is to remove those tolerance questions from the user-facing
-  questionnaire and replace substance hard filters with feed-level user filters.
-- Local Supabase email confirmation is currently disabled in
-  `supabase/config.toml`; the registration screen still supports the
-  confirmation-message path if Supabase is configured to require confirmation.
 
 ## MVP Users and Scope
 
@@ -131,7 +106,7 @@ missing.
 - Title: `Configure Supabase`.
 - Body copy explaining the required `mobile/.env` keys.
 
-**PO guidance:** This screen is a developer/demo safety net. It should remain
+**PO notes:** This screen is a developer/demo safety net. It should remain
 plain and specific so configuration failures are easy to diagnose.
 
 ### 2. Login Screen
