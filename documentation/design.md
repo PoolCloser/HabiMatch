@@ -1,7 +1,7 @@
 # HabiMatch Product Design Document
 
 **Product:** HabiMatch 1.0  
-**Author:** Koa Wolfe, Product Owner  
+**Author:** Koa Wolfe -- Product Owner  
 **Release target:** June 2, 2026  
 **Last revised:** May 18, 2026
 
@@ -14,30 +14,9 @@ create an account, complete onboarding, answer the questionnaire, review ranked
 roommate cards, save discovery decisions, receive mutual-match notifications,
 and message matches.
 
-This document was written by the Product Owner for the direction of the engineering
+This document was written for the direction of the engineering
 team. It defines the MVP feature scope, user flows, screen-level expectations,
 and product rules that should guide implementation.
-
-## Source of Truth
-
-The release plan describes the original roadmap. When this document and the
-release plan diverge, the currently implemented HabiMatch feature set supersedes
-the release plan.
-
-Current pre-1.0 implementation notes:
-
-- Messaging, mutual match notifications, and group chat are not implemented yet,
-  but they remain planned for the HabiMatch 1.0 release.
-- The Messages tab currently exists as a disabled placeholder until chat work is
-  implemented.
-- The mobile app currently reads and writes Supabase directly for profile,
-  questionnaire, feed, and discovery-decision behavior.
-- The backend contains protected profile and lifestyle routes plus the
-  authoritative Python matching implementation, but the current mobile feed uses
-  a TypeScript mirror in `mobile/src/lib/matching.ts` for client-side ranking.
-- Local Supabase email confirmation is currently disabled in
-  `supabase/config.toml`; the registration screen still supports the
-  confirmation-message path if Supabase is configured to require confirmation.
 
 ## MVP Users and Scope
 
@@ -59,11 +38,12 @@ admin tooling, or web-only workflows.
 | Linear onboarding | Implemented | Basic Info -> Profile Photo -> Questionnaire -> Home. |
 | Basic profile info | Implemented | Name, location, birth date, and binary gender. |
 | Profile photo setup | Implemented | Upload from library or skip with default avatar. |
-| Lifestyle questionnaire | Implemented | One question at a time, stores matching inputs. |
-| Compatibility scoring | Implemented | Python backend algorithm and TypeScript mobile mirror must stay aligned. |
+| Lifestyle questionnaire | Implemented, update required | One question at a time. Cigarette, marijuana, and alcohol questions should collect self-use only. |
+| Compatibility scoring | Implemented, update required | Python backend algorithm and TypeScript mobile mirror must stay aligned; substance-use hard filters should be removed. |
 | Roommate feed | Implemented | Shows one top ranked card at a time from up to 8 ranked candidates. |
 | Like/dislike decisions | Implemented | Saves to `discovery_decisions` and removes the card. |
 | Gender and age filters | Implemented | Client-side filters on ranked feed. |
+| Substance-use feed filters | Planned for 1.0 | Let users hide profiles based on cigarette, marijuana, or alcohol use. |
 | Profile editing | Implemented | Edit display name, bio, location, and avatar. |
 | Mutual match detection | Planned for 1.0 | A mutual like should create a match relationship. |
 | Match notifications | Planned for 1.0 | Notify users when a mutual match occurs. |
@@ -85,6 +65,10 @@ admin tooling, or web-only workflows.
   screen.
 - A mutual match occurs when both users have liked each other.
 - Users should only be able to message people they have mutually matched with.
+- Cigarette smoking, marijuana use, and alcohol use are self-reported lifestyle
+  attributes, not matching hard filters.
+- Users who do not want to see roommates with those substance-use habits should
+  control that from the Roommate Feed filter panel.
 - Hard-filter failures are allowed to appear after passing matches, but they
   must be labeled `Filtered` instead of showing a score.
 - Numeric questionnaire scores are internal. User-facing copy must use plain
@@ -122,7 +106,7 @@ missing.
 - Title: `Configure Supabase`.
 - Body copy explaining the required `mobile/.env` keys.
 
-**PO guidance:** This screen is a developer/demo safety net. It should remain
+**PO notes:** This screen is a developer/demo safety net. It should remain
 plain and specific so configuration failures are easy to diagnose.
 
 ### 2. Login Screen
@@ -272,14 +256,18 @@ Final onboarding step and the core source of matching data.
 - Validates budget min/max before continuing.
 - Converts move-in timing to a concrete ISO date.
 - Converts bedtime from a time picker to a `0..4` score.
-- Auto-skips substance tolerance questions when the user does that behavior.
+- Asks whether the user smokes cigarettes, uses marijuana, or drinks alcohol at
+  home.
+- Does not ask whether the user is willing to live with someone who smokes
+  cigarettes, uses marijuana, or drinks alcohol.
 - Saves to `lifestyle_preferences`.
 - Sets `profiles.questionnaire_complete = true`.
 
 **Question groups:**
 
 - Logistics: budget and move-in timing.
-- Lifestyle: smoking, marijuana, and alcohol behavior/tolerance.
+- Lifestyle: cigarette smoking, marijuana use, and alcohol use as self-reported
+  behavior only.
 - Home Life: pets and overnight guests.
 - Sleep & Schedule: bedtime, late-night noise tolerance, work/study from home.
 - Noise & Environment: usual noise behavior and focus tolerance.
@@ -302,8 +290,10 @@ Final onboarding step and the core source of matching data.
 
 **PO guidance:** The questionnaire is the most product-critical onboarding
 surface. Keep copy conversational and avoid exposing internal numeric values.
-Any new question must have a matching storage field, matching-model mapping,
-test coverage, and documentation update.
+Substance-use tolerance questions should not appear in the questionnaire; user
+control for those preferences belongs in the Roommate Feed filter panel. Any new
+or removed question must have a matching storage-field decision, matching-model
+mapping, test coverage, and documentation update.
 
 ### 8. Home / Roommate Feed Screen
 
@@ -319,6 +309,8 @@ Primary post-onboarding screen. Shows ranked roommate recommendations.
 - Sorts passing matches ahead of filtered matches, then by score.
 - Limits the ranked set to 8.
 - Displays the first visible match after filters.
+- Applies user-selected feed filters after ranking, including gender, age, and
+  substance-use filters.
 - Saves like/dislike decisions to `discovery_decisions`.
 - Removes decided cards immediately.
 - Supports manual refresh.
@@ -332,6 +324,8 @@ Primary post-onboarding screen. Shows ranked roommate recommendations.
 - Bio.
 - Budget range.
 - Move-in date.
+- Substance-use indicators for cigarette, marijuana, and alcohol habits when
+  needed to make feed filtering transparent.
 - Top two scoring compatibility domains, or the first hard-filter failure.
 
 **Filtering behavior:**
@@ -340,6 +334,10 @@ Primary post-onboarding screen. Shows ranked roommate recommendations.
 - Gender filter supports Man and Woman.
 - Age range supports minimum and maximum numeric inputs.
 - Minimum age is clamped to 18 on blur.
+- Substance-use filters let users hide profiles that smoke cigarettes, use
+  marijuana, or drink alcohol at home.
+- Substance-use filters are user-controlled visibility filters, not scoring
+  penalties and not automatic hard-filter failures.
 - Active filters change the filter button styling.
 - If ranked matches exist but filters hide all of them, show `No matches for
   filters`.
@@ -355,7 +353,8 @@ Primary post-onboarding screen. Shows ranked roommate recommendations.
 **UI elements:**
 
 - Top bar with `HM`, `Roommate Feed`, and Filter button.
-- Optional filter panel.
+- Optional filter panel with gender controls, age range inputs, and
+  substance-use toggles or checkboxes.
 - Large match card.
 - Score pill.
 - Photo area.
@@ -490,10 +489,15 @@ mobile mirror in `mobile/src/lib/matching.ts` powers the current feed.
 |---|---|
 | Budget | Budget ranges must overlap. |
 | Move-in date | Move-in dates must be within 90 days. |
-| Smoking | A smoker must match with someone okay with smoking. |
-| Marijuana | A marijuana user must match with someone okay with marijuana. |
-| Alcohol | A user who drinks at home must match with someone okay with alcohol at home. |
 | Pets | A pet owner must match with someone okay with pets. |
+
+**Not hard filters:**
+
+| Attribute | Matching rule |
+|---|---|
+| Cigarette smoking | Collected as self-reported behavior and filterable in the feed. Does not automatically fail compatibility. |
+| Marijuana use | Collected as self-reported behavior and filterable in the feed. Does not automatically fail compatibility. |
+| Alcohol use at home | Collected as self-reported behavior and filterable in the feed. Does not automatically fail compatibility. |
 
 **Scored domains:**
 
@@ -512,8 +516,12 @@ home, scaled by noise sensitivity, then all weights are normalized.
 
 **PO rules:**
 
-- Hard filters remain absolute unless the PO explicitly changes the matching
-  strategy.
+- Remaining hard filters stay absolute unless the PO explicitly changes the
+  matching strategy.
+- Cigarette smoking, marijuana use, and alcohol use must not produce
+  compatibility failures or `Filtered` labels by themselves.
+- Substance-use preferences belong in the Roommate Feed filters so each user can
+  decide what they want to see.
 - Passing matches display a whole-number percentage.
 - Filtered matches display `Filtered`, not a percentage.
 - The top two domain labels shown on a passing feed card must be computed from
@@ -535,6 +543,11 @@ The current app expects these Supabase resources:
 | `lifestyle_preferences` | Questionnaire responses used for compatibility scoring. |
 | `discovery_decisions` | Current user's like/dislike decisions for candidate profiles. |
 | `profile-photos` | Supabase storage bucket for uploaded avatar images. |
+
+Substance-use fields should store whether the user smokes cigarettes, uses
+marijuana, or drinks alcohol at home. The legacy tolerance fields for those
+habits should not drive 1.0 matching once the questionnaire and matching update
+is complete.
 
 Planned 1.0 messaging and notification work will also need persistent resources
 for mutual matches, conversations, messages, conversation participants, and
@@ -590,7 +603,7 @@ set from the remaining planned 1.0 scope.
 | Direct messaging | Planned for 1.0. Messages tab is currently disabled until implemented. |
 | Group chat | Planned for 1.0 if Sprint 3 scope remains unchanged. |
 | Profile and match preferences editable at any time | Partially implemented. Profile fields are editable; questionnaire responses are not. |
-| Advanced filters | Partially implemented. Age and gender filters exist; broader filters are deferred. |
+| Advanced filters | Expanded for 1.0. Age and gender filters exist; cigarette, marijuana, and alcohol filters should be added. |
 | Web app | Deferred as a product target, though Expo web preview may be used for development/demo. |
 | NumPy algorithm math | Not used in current implementation. Matching uses Python standard math and a TypeScript mirror. |
 | EAS distribution | Planned release path, not a screen-level MVP feature. |
@@ -604,6 +617,8 @@ set from the remaining planned 1.0 scope.
 - Keep onboarding linear until the team designs re-entry and partial-completion
   behavior.
 - Treat questionnaire changes as cross-stack changes, not mobile-only copy work.
+- When removing a questionnaire tolerance question, update storage, matching,
+  feed filters, test data, and documentation together.
 - Keep the UI consistent: blue brand background for onboarding, white cards,
   clear selected states, obvious disabled states, and short direct copy.
 - Preserve the disabled Delete Account affordance as a visible roadmap signal.

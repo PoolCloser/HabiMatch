@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "customConditions": [],
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "noEmit": false,
+    "outDir": ".test-build",
+    "rootDir": ".",
+    "target": "ES2022",
+    "types": ["node"],
+    "verbatimModuleSyntax": false
+  },
+  "include": [
+    "src/lib/authErrors.ts",
+    "src/lib/matching.ts",
+    "tests/**/*.ts"
+  ],
+  "exclude": [
+    ".test-build",
+    "node_modules"
+  ]
+}

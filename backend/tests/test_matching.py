@@ -49,15 +49,12 @@ def test_matching_requires_auth(client):
 
 
 def test_matching_hard_filter_failure_returns_zero_score(client, make_token):
-    left = _participant(preferences={"ok_with_pets": False})
+    left = _participant()
     right = _participant(
         user_id="user-2",
         preferences={
-            "smokes": True,
-            "uses_marijuana": True,
-            "drinks_alcohol": True,
-            "ok_with_alcohol": False,
-            "has_pets": True,
+            "budget_min": 2000,
+            "budget_max": 2400,
         },
     )
 
@@ -71,10 +68,38 @@ def test_matching_hard_filter_failure_returns_zero_score(client, make_token):
     body = response.json()
     assert body["passed_filters"] is False
     assert body["overall_score"] == 0.0
-    assert "Smoking preference is not mutually compatible." in body["failures"]
-    assert "Marijuana preference is not mutually compatible." in body["failures"]
-    assert "Alcohol preference is not mutually compatible." in body["failures"]
-    assert "Pet preference is not mutually compatible." in body["failures"]
+    assert body["failures"] == ["Budget ranges do not overlap."]
+
+
+def test_matching_accepts_lifestyle_answers_without_tolerances(client, make_token):
+    left = _participant()
+    right = _participant(
+        user_id="user-2",
+        preferences={
+            "smokes": True,
+            "uses_marijuana": True,
+            "drinks_alcohol": True,
+            "has_pets": True,
+            "ok_with_smoking": None,
+            "ok_with_marijuana": None,
+            "ok_with_alcohol": None,
+            "ok_with_pets": None,
+        },
+    )
+
+    response = client.post(
+        "/matching/compatibility",
+        json={"left": left, "right": right},
+        headers={"Authorization": f"Bearer {make_token()}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["passed_filters"] is True
+    assert body["filter_details"]["smoking_compatible"] is True
+    assert body["filter_details"]["marijuana_compatible"] is True
+    assert body["filter_details"]["alcohol_compatible"] is True
+    assert body["filter_details"]["pets_compatible"] is True
 
 
 def test_matching_returns_weighted_domain_breakdown(client, make_token):

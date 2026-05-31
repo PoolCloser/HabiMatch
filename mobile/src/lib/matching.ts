@@ -2,13 +2,9 @@ export type Gender = 'man' | 'woman' | null;
 
 export type MatchPreferences = {
   smokes: boolean;
-  okWithSmoking: boolean;
   usesMarijuana: boolean;
-  okWithMarijuana: boolean;
   drinksAlcohol: boolean;
-  okWithAlcohol: boolean;
   hasPets: boolean;
-  okWithPets: boolean;
   partnerStaysOver: number;
   okWithPartnersStaying: number;
   studyOrWfh: boolean;
@@ -142,17 +138,6 @@ function moveInScore(gapDays: number): number {
   return clampUnit(1 - gapDays / MOVE_IN_MAX_GAP_DAYS);
 }
 
-function booleanPairCompatible(
-  leftBehavior: boolean,
-  leftTolerance: boolean,
-  rightBehavior: boolean,
-  rightTolerance: boolean,
-): boolean {
-  if (leftBehavior && !rightTolerance) return false;
-  if (rightBehavior && !leftTolerance) return false;
-  return true;
-}
-
 function normalizedWeights(left: MatchParticipant, right: MatchParticipant): Record<DomainKey, number> {
   const weights = { ...BASE_DOMAIN_WEIGHTS };
   const leftSensitivity = left.preferences.studyOrWfh
@@ -186,18 +171,6 @@ export function calculateCompatibility(
   const failures: string[] = [];
   if (!budgetOverlap) failures.push('Budget ranges do not overlap.');
   if (!moveInCompatible) failures.push('Move-in timelines are too far apart.');
-  if (!booleanPairCompatible(leftP.smokes, leftP.okWithSmoking, rightP.smokes, rightP.okWithSmoking)) {
-    failures.push('Smoking preference is not mutually compatible.');
-  }
-  if (!booleanPairCompatible(leftP.usesMarijuana, leftP.okWithMarijuana, rightP.usesMarijuana, rightP.okWithMarijuana)) {
-    failures.push('Marijuana preference is not mutually compatible.');
-  }
-  if (!booleanPairCompatible(leftP.drinksAlcohol, leftP.okWithAlcohol, rightP.drinksAlcohol, rightP.okWithAlcohol)) {
-    failures.push('Alcohol preference is not mutually compatible.');
-  }
-  if (!booleanPairCompatible(leftP.hasPets, leftP.okWithPets, rightP.hasPets, rightP.okWithPets)) {
-    failures.push('Pet preference is not mutually compatible.');
-  }
 
   if (failures.length > 0) {
     return {
