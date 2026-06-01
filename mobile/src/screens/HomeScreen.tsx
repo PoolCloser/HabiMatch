@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
+  PanResponder,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -94,6 +97,9 @@ const MUTED = '#6B7280';
 const CARD = '#FFFFFF';
 
 type DashboardTab = 'feed' | 'messages' | 'profile';
+const SWIPE_THRESHOLD = 110;
+const SWIPE_OUT_DISTANCE = 520;
+
 const DOMAIN_LABELS: Record<DomainKey, string> = {
   logistics: 'Logistics',
   sleep: 'Sleep',
@@ -137,6 +143,7 @@ const PREFERENCE_COLUMNS = [
 export default function HomeScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [loadingMatches, setLoadingMatches] = useState(true);
+  const [refreshingFeed, setRefreshingFeed] = useState(false);
   const [authError, setAuthError] = useState('');
   const [rankingError, setRankingError] = useState('');
   const [matches, setMatches] = useState<RankedMatch[]>([]);
@@ -164,13 +171,20 @@ export default function HomeScreen() {
   const [hideMarijuanaUsers, setHideMarijuanaUsers] = useState(false);
   const [hideAlcoholUsers, setHideAlcoholUsers] = useState(false);
   const [hidePetOwners, setHidePetOwners] = useState(false);
+  const swipeX = useRef(new Animated.Value(0)).current;
 
   const markImageFailed = (url: string) => {
     setFailedImageUrls(current => new Set(current).add(url));
   };
 
-  const loadRankings = async () => {
-    setLoadingMatches(true);
+  // Loads the ranked roommate feed. Initial loads show the full loading card;
+  // pull-to-refresh uses the same data path without replacing the whole feed.
+  const loadRankings = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshingFeed(true);
+    } else {
+      setLoadingMatches(true);
+    }
     setRankingError('');
     setDecisionError('');
 
@@ -276,7 +290,11 @@ export default function HomeScreen() {
       setSkippedCount(0);
       setRankingError(error instanceof Error ? error.message : 'Could not load compatibility rankings.');
     } finally {
-      setLoadingMatches(false);
+      if (isRefresh) {
+        setRefreshingFeed(false);
+      } else {
+        setLoadingMatches(false);
+      }
     }
   };
 
@@ -399,8 +417,13 @@ export default function HomeScreen() {
     }
   };
 
-  const handleDiscoveryDecision = async (decision: DiscoveryDecision) => {
-    if (!topMatch || savingDecision) return;
+  // Persists a like/dislike decision. Swipe gestures call this instead of
+  // writing directly to discovery_decisions, keeping match notices consistent.
+  const handleDiscoveryDecision = async (
+    decision: DiscoveryDecision,
+    match: RankedMatch | null = topMatch,
+  ): Promise<boolean> => {
+    if (!match || savingDecision) return false;
 
     setSavingDecision(decision);
     setDecisionError('');
@@ -415,7 +438,7 @@ export default function HomeScreen() {
         .from('discovery_decisions')
         .upsert({
           user_id: userId,
-          target_user_id: topMatch.userId,
+          target_user_id: match.userId,
           decision,
         }, {
           onConflict: 'user_id,target_user_id',
@@ -423,16 +446,18 @@ export default function HomeScreen() {
       if (error) throw error;
 
       if (decision === 'like') {
-        const isMutual = await checkMutualMatch(topMatch.userId);
+        const isMutual = await checkMutualMatch(match.userId);
         if (isMutual) {
-          setMutualMatchNotice(`You matched with ${displayName(topMatch)}! Open Messages to chat.`);
+          setMutualMatchNotice(`You matched with ${displayName(match)}! Open Messages to chat.`);
         }
       }
 
-      setMatches(current => current.filter(match => match.userId !== topMatch.userId));
+      setMatches(current => current.filter(currentMatch => currentMatch.userId !== match.userId));
+      return true;
     } catch (error) {
       console.error('Could not save discovery decision', error);
       setDecisionError('Could not save your choice. Please try again.');
+      return false;
     } finally {
       setSavingDecision(null);
     }
@@ -462,6 +487,89 @@ export default function HomeScreen() {
 
   const topMatch = filteredMatches[0] ?? null;
 
+  useEffect(() => {
+    swipeX.setValue(0);
+  }, [swipeX, topMatch?.userId]);
+
+  const resetSwipePosition = () => {
+    Animated.spring(swipeX, {
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const completeSwipe = (decision: DiscoveryDecision, match: RankedMatch, toValue: number) => {
+    Animated.timing(swipeX, {
+      toValue,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(async () => {
+      const saved = await handleDiscoveryDecision(decision, match);
+      if (!saved) {
+        resetSwipePosition();
+      } else {
+        swipeX.setValue(0);
+      }
+    });
+  };
+
+  const panResponder = useMemo(() =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Boolean(topMatch)
+        && !savingDecision
+        && Math.abs(gesture.dx) > 8
+        && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderMove: (_, gesture) => {
+        swipeX.setValue(gesture.dx);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (!topMatch) {
+          resetSwipePosition();
+          return;
+        }
+
+        if (gesture.dx <= -SWIPE_THRESHOLD) {
+          completeSwipe('dislike', topMatch, -SWIPE_OUT_DISTANCE);
+          return;
+        }
+
+        if (gesture.dx >= SWIPE_THRESHOLD) {
+          completeSwipe('like', topMatch, SWIPE_OUT_DISTANCE);
+          return;
+        }
+
+        resetSwipePosition();
+      },
+      onPanResponderTerminate: resetSwipePosition,
+    }),
+  [savingDecision, swipeX, topMatch?.userId]);
+
+  const cardTransform = {
+    transform: [
+      { translateX: swipeX },
+      {
+        rotate: swipeX.interpolate({
+          inputRange: [-SWIPE_OUT_DISTANCE, 0, SWIPE_OUT_DISTANCE],
+          outputRange: ['-12deg', '0deg', '12deg'],
+          extrapolate: 'clamp',
+        }),
+      },
+    ],
+  };
+
+  const rejectOpacity = swipeX.interpolate({
+    inputRange: [-SWIPE_THRESHOLD, -40],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const acceptOpacity = swipeX.interpolate({
+    inputRange: [40, SWIPE_THRESHOLD],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
   if (chatTarget) {
     return (
       <ChatScreen
@@ -482,7 +590,19 @@ export default function HomeScreen() {
           <MessagesScreen onOpenChat={setChatTarget} />
         </View>
       ) : (
-      <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.root}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          activeTab === 'feed' ? (
+            <RefreshControl
+              refreshing={refreshingFeed}
+              onRefresh={() => void loadRankings(true)}
+              tintColor={PRIMARY}
+            />
+          ) : undefined
+        }
+      >
         {activeTab === 'feed' ? (
           <>
             <View style={styles.topBar}>
@@ -599,76 +719,55 @@ export default function HomeScreen() {
                 <Text style={styles.loadingText}>Scoring matches...</Text>
               </View>
             ) : topMatch ? (
-              <View style={styles.heroCard}>
-                <View style={styles.matchHeader}>
-                  <View>
-                    <Text style={styles.matchName}>{displayName(topMatch)}</Text>
-                    <Text style={styles.matchMeta}>{formatProfileMeta(topMatch)}</Text>
-                  </View>
-                  <View style={[styles.scorePill, !topMatch.passedFilters && styles.filteredPill]}>
-                    <Text style={[styles.scoreText, !topMatch.passedFilters && styles.filteredText]}>
-                      {topMatch.passedFilters ? `${formatPercent(topMatch.score)}%` : 'Filtered'}
-                    </Text>
-                  </View>
-                </View>
+              <View style={styles.swipeStage}>
+                <Animated.View style={[styles.swipeCue, styles.rejectCue, { opacity: rejectOpacity }]}>
+                  <Ionicons name="close" size={34} color="#B42318" />
+                </Animated.View>
+                <Animated.View style={[styles.swipeCue, styles.acceptCue, { opacity: acceptOpacity }]}>
+                  <Ionicons name="checkmark" size={34} color="#067647" />
+                </Animated.View>
 
-                <View style={styles.photoFrame}>
-                  {topMatch.avatarUrl && !failedImageUrls.has(topMatch.avatarUrl) ? (
-                    <Image
-                      source={{ uri: topMatch.avatarUrl }}
-                      style={styles.profileImage}
-                      onError={() => markImageFailed(topMatch.avatarUrl as string)}
-                    />
-                  ) : (
-                    <View style={styles.photoFallback}>
-                      <Text style={styles.photoInitial}>{displayInitial(topMatch)}</Text>
+                <Animated.View
+                  style={[styles.heroCard, cardTransform, savingDecision && styles.actionDisabled]}
+                  {...panResponder.panHandlers}
+                >
+                  <View style={styles.matchHeader}>
+                    <View>
+                      <Text style={styles.matchName}>{displayName(topMatch)}</Text>
+                      <Text style={styles.matchMeta}>{formatProfileMeta(topMatch)}</Text>
                     </View>
-                  )}
-                </View>
+                    <View style={[styles.scorePill, !topMatch.passedFilters && styles.filteredPill]}>
+                      <Text style={[styles.scoreText, !topMatch.passedFilters && styles.filteredText]}>
+                        {topMatch.passedFilters ? `${formatPercent(topMatch.score)}%` : 'Filtered'}
+                      </Text>
+                    </View>
+                  </View>
 
-                <View style={styles.infoStack}>
-                  <InfoRow label="Bio" value={topMatch.bio?.trim() || 'Bio not shown yet.'} />
-                  <InfoRow label="Lifestyle" value={formatLifestyle(topMatch)} />
-                  <InfoRow label="Budget" value={formatBudget(topMatch.budgetMin, topMatch.budgetMax)} />
-                  <InfoRow label="Move-in date" value={formatDate(topMatch.moveInDate)} />
-                  <InfoRow
-                    label="Compatibility"
-                    value={topMatch.passedFilters ? topDomainSummary(topMatch.domains) : topMatch.failures[0] ?? 'Dealbreaker mismatch'}
-                  />
-                </View>
+                  <View style={styles.photoFrame}>
+                    {topMatch.avatarUrl && !failedImageUrls.has(topMatch.avatarUrl) ? (
+                      <Image
+                        source={{ uri: topMatch.avatarUrl }}
+                        style={styles.profileImage}
+                        onError={() => markImageFailed(topMatch.avatarUrl as string)}
+                      />
+                    ) : (
+                      <View style={styles.photoFallback}>
+                        <Text style={styles.photoInitial}>{displayInitial(topMatch)}</Text>
+                      </View>
+                    )}
+                  </View>
 
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.roundAction,
-                      styles.rejectAction,
-                      savingDecision && styles.actionDisabled,
-                    ]}
-                    onPress={() => void handleDiscoveryDecision('dislike')}
-                    disabled={Boolean(savingDecision)}
-                  >
-                    {savingDecision === 'dislike' ? (
-                      <ActivityIndicator color="#B42318" />
-                    ) : (
-                      <Ionicons name="close" size={24} color="#B42318" />
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.roundAction,
-                      styles.acceptAction,
-                      savingDecision && styles.actionDisabled,
-                    ]}
-                    onPress={() => void handleDiscoveryDecision('like')}
-                    disabled={Boolean(savingDecision)}
-                  >
-                    {savingDecision === 'like' ? (
-                      <ActivityIndicator color="#067647" />
-                    ) : (
-                      <Ionicons name="checkmark" size={24} color="#067647" />
-                    )}
-                  </TouchableOpacity>
-                </View>
+                  <View style={styles.infoStack}>
+                    <InfoRow label="Bio" value={topMatch.bio?.trim() || 'Bio not shown yet.'} />
+                    <InfoRow label="Lifestyle" value={formatLifestyle(topMatch)} />
+                    <InfoRow label="Budget" value={formatBudget(topMatch.budgetMin, topMatch.budgetMax)} />
+                    <InfoRow label="Move-in date" value={formatDate(topMatch.moveInDate)} />
+                    <InfoRow
+                      label="Compatibility"
+                      value={topMatch.passedFilters ? topDomainSummary(topMatch.domains) : topMatch.failures[0] ?? 'Dealbreaker mismatch'}
+                    />
+                  </View>
+                </Animated.View>
               </View>
             ) : matches.length > 0 ? (
               <View style={styles.stateCard}>
@@ -694,10 +793,6 @@ export default function HomeScreen() {
                     : `${matches.length} ranked${skippedCount > 0 ? ` - ${skippedCount} incomplete skipped` : ''}`
                   : 'Waiting for completed profiles'}
               </Text>
-              <TouchableOpacity style={styles.refreshBtn} onPress={loadRankings} disabled={loadingMatches}>
-                <Ionicons name="refresh" size={16} color={PRIMARY} />
-                <Text style={styles.refreshText}>Refresh</Text>
-              </TouchableOpacity>
             </View>
           </>
         ) : (
@@ -1138,6 +1233,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  swipeStage: {
+    position: 'relative',
+    marginBottom: 4,
+  },
+  swipeCue: {
+    position: 'absolute',
+    top: '38%',
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    zIndex: 0,
+  },
+  rejectCue: {
+    left: 10,
+    backgroundColor: '#FEEDEB',
+    borderColor: '#FAD4D0',
+  },
+  acceptCue: {
+    right: 10,
+    backgroundColor: '#ECFDF3',
+    borderColor: '#B7E4C7',
+  },
   heroCard: {
     backgroundColor: CARD,
     borderRadius: 20,
@@ -1209,30 +1329,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
   },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-    marginTop: 8,
-  },
-  roundAction: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
   actionDisabled: {
     opacity: 0.55,
-  },
-  rejectAction: {
-    backgroundColor: '#FEEDEB',
-    borderColor: '#FAD4D0',
-  },
-  acceptAction: {
-    backgroundColor: '#ECFDF3',
-    borderColor: '#B7E4C7',
   },
   scorePill: {
     backgroundColor: '#EAF4FF',
@@ -1261,22 +1359,6 @@ const styles = StyleSheet.create({
   feedMetaText: {
     flex: 1,
     color: MUTED,
-    fontSize: 13,
-  },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    borderColor: '#CFE0F3',
-    backgroundColor: CARD,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  refreshText: {
-    color: PRIMARY,
-    fontWeight: '700',
     fontSize: 13,
   },
   errorBanner: {
