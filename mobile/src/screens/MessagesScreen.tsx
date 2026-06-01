@@ -282,7 +282,7 @@ export default function MessagesScreen({ onOpenChat }: Props) {
           contentContainerStyle={items.length === 0 ? styles.emptyList : styles.list}
           ListEmptyComponent={
             <View style={styles.emptyCard}>
-              <Ionicons name="heart-outline" size={40} color={PRIMARY} />
+              <Ionicons name="home-outline" size={40} color={PRIMARY} />
               <Text style={styles.emptyTitle}>No mutual matches yet</Text>
               <Text style={styles.emptyBody}>
                 When you and someone both tap the check on the feed, they will show up here.

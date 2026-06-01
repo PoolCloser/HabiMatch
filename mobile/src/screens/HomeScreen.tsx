@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Image,
+  Modal,
   PanResponder,
   RefreshControl,
   ScrollView,
@@ -19,6 +20,7 @@ import { uploadProfilePhoto } from '../lib/profilePhotos';
 import { checkMutualMatch } from '../lib/messaging';
 import MessagesScreen, { type ChatTarget } from './MessagesScreen';
 import ChatScreen from './ChatScreen';
+import QuestionnaireScreen from './QuestionnaireScreen';
 import {
   calculateCompatibility,
   type DomainKey,
@@ -148,6 +150,7 @@ export default function HomeScreen() {
   const [rankingError, setRankingError] = useState('');
   const [matches, setMatches] = useState<RankedMatch[]>([]);
   const [currentUser, setCurrentUser] = useState<RankedMatch | null>(null);
+  const [signedInUserId, setSignedInUserId] = useState<string | null>(null);
   const [selfProfile, setSelfProfile] = useState<ProfileRecord | null>(null);
   const [skippedCount, setSkippedCount] = useState(0);
   const [activeTab, setActiveTab] = useState<DashboardTab>('feed');
@@ -163,6 +166,8 @@ export default function HomeScreen() {
   const [decisionError, setDecisionError] = useState('');
   const [mutualMatchNotice, setMutualMatchNotice] = useState<string | null>(null);
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
+  const [editingPreferences, setEditingPreferences] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [genderFilter, setGenderFilter] = useState<'man' | 'woman' | null>(null);
   const [ageMin, setAgeMin] = useState('');
@@ -193,6 +198,7 @@ export default function HomeScreen() {
       if (userError) throw userError;
       const userId = authData.user?.id;
       if (!userId) throw new Error('No signed-in user found.');
+      setSignedInUserId(userId);
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -286,6 +292,7 @@ export default function HomeScreen() {
     } catch (error) {
       setMatches([]);
       setCurrentUser(null);
+      setSignedInUserId(null);
       setSelfProfile(null);
       setSkippedCount(0);
       setRankingError(error instanceof Error ? error.message : 'Could not load compatibility rankings.');
@@ -415,6 +422,13 @@ export default function HomeScreen() {
     } finally {
       setUpdatingPhoto(false);
     }
+  };
+
+  const handlePreferencesUpdated = () => {
+    setEditingPreferences(false);
+    setActiveTab('profile');
+    setProfileSaveMessage('Preferences updated.');
+    void loadRankings();
   };
 
   // Persists a like/dislike decision. Swipe gestures call this instead of
@@ -569,6 +583,17 @@ export default function HomeScreen() {
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
+
+  if (editingPreferences && signedInUserId) {
+    return (
+      <QuestionnaireScreen
+        userId={signedInUserId}
+        mode="edit"
+        onComplete={handlePreferencesUpdated}
+        onCancel={() => setEditingPreferences(false)}
+      />
+    );
+  }
 
   if (chatTarget) {
     return (
@@ -799,7 +824,11 @@ export default function HomeScreen() {
           <>
             <View style={styles.profileTopBar}>
               <Text style={styles.logo}>HM</Text>
-              <TouchableOpacity style={styles.iconBtn} disabled>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => setShowProfileSettings(true)}
+                accessibilityLabel="Open profile settings"
+              >
                 <Ionicons name="settings-outline" size={22} color={TEXT} />
               </TouchableOpacity>
             </View>
@@ -893,25 +922,67 @@ export default function HomeScreen() {
                 : <Text style={styles.profileActionText}>Save profile</Text>}
             </TouchableOpacity>
 
-            {authError ? <Text style={styles.authError}>{authError}</Text> : null}
-
             <TouchableOpacity
-              style={[styles.profileAction, signingOut && styles.btnDisabled]}
-              onPress={handleSignOut}
-              disabled={signingOut}
+              style={[styles.profileAction, !signedInUserId && styles.btnDisabled]}
+              onPress={() => setEditingPreferences(true)}
+              disabled={!signedInUserId}
             >
-              {signingOut
-                ? <ActivityIndicator color={PRIMARY} />
-                : <Text style={styles.profileActionText}>Sign out</Text>}
+              <Text style={styles.profileActionText}>Update Preferences</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.deleteAction} disabled>
-              <Text style={styles.deleteActionText}>Delete account</Text>
-            </TouchableOpacity>
+            {authError ? <Text style={styles.authError}>{authError}</Text> : null}
           </>
         )}
       </ScrollView>
       )}
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={showProfileSettings}
+        onRequestClose={() => setShowProfileSettings(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.settingsPanel}>
+            <View style={styles.settingsHeader}>
+              <Text style={styles.settingsTitle}>Profile settings</Text>
+              <TouchableOpacity
+                style={styles.settingsCloseBtn}
+                onPress={() => setShowProfileSettings(false)}
+                accessibilityLabel="Close profile settings"
+              >
+                <Ionicons name="close" size={22} color={TEXT} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.settingsAction, signingOut && styles.btnDisabled]}
+              onPress={() => {
+                setShowProfileSettings(false);
+                void handleSignOut();
+              }}
+              disabled={signingOut}
+            >
+              {signingOut ? (
+                <ActivityIndicator color={PRIMARY} />
+              ) : (
+                <>
+                  <Ionicons name="log-out-outline" size={20} color={PRIMARY} />
+                  <Text style={styles.settingsActionText}>Sign out</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.settingsAction, styles.deleteSettingsAction]} disabled>
+              <Ionicons name="trash-outline" size={20} color="#B42318" />
+              <Text style={styles.deleteActionText}>Delete account</Text>
+            </TouchableOpacity>
+            <Text style={styles.settingsHint}>
+              Account deletion needs backend support before it can be enabled.
+            </Text>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.tabBar}>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('feed')}>
@@ -1533,6 +1604,67 @@ const styles = StyleSheet.create({
     color: '#B42318',
     fontSize: 15,
     fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(17, 24, 39, 0.35)',
+  },
+  settingsPanel: {
+    backgroundColor: CARD,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 34,
+    borderWidth: 1,
+    borderColor: '#E4EAF2',
+  },
+  settingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  settingsTitle: {
+    color: TEXT,
+    fontSize: 19,
+    fontWeight: '800',
+  },
+  settingsCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F6FA',
+  },
+  settingsAction: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#D8E6F5',
+    backgroundColor: CARD,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  settingsActionText: {
+    color: PRIMARY,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  deleteSettingsAction: {
+    borderColor: '#FAD4D0',
+    backgroundColor: '#FFF7F6',
+    opacity: 0.65,
+  },
+  settingsHint: {
+    color: MUTED,
+    fontSize: 12,
+    lineHeight: 17,
   },
   tabBar: {
     position: 'absolute',
