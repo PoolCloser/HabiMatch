@@ -20,8 +20,25 @@ type Props = {
 };
 
 const PRIMARY = '#4A90D9';
-const DEFAULT_AVATAR_URL =
-  'https://ui-avatars.com/api/?name=HabiMatch&background=E5EAF4&color=AEB7C5&size=256&rounded=true&bold=true';
+
+type ProfileNameRecord = {
+  full_name: string | null;
+};
+
+export function defaultAvatarInitials(fullName: string | null): string {
+  const parts = fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const initials = parts
+    .slice(0, 2)
+    .map(part => part.charAt(0).toUpperCase())
+    .join('');
+  return initials || 'H';
+}
+
+export function buildDefaultAvatarUrl(fullName: string | null): string {
+  const initials = defaultAvatarInitials(fullName);
+  const avatarName = initials.split('').join(' ');
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(avatarName)}&background=E5EAF4&color=AEB7C5&size=256&rounded=true&bold=true`;
+}
 
 export default function ProfilePhotoScreen({ userId, onComplete }: Props) {
   const [selectedAsset, setSelectedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -41,6 +58,20 @@ export default function ProfilePhotoScreen({ userId, onComplete }: Props) {
     if (profileError) {
       throw profileError;
     }
+  };
+
+  const fetchProfileName = async (): Promise<string | null> => {
+    const { data, error: profileError } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .maybeSingle<ProfileNameRecord>();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    return data?.full_name ?? null;
   };
 
   const handleChooseImage = async () => {
@@ -68,7 +99,8 @@ export default function ProfilePhotoScreen({ userId, onComplete }: Props) {
     setError('');
     setSaving(true);
     try {
-      await saveProfileAvatar(DEFAULT_AVATAR_URL);
+      const fullName = await fetchProfileName();
+      await saveProfileAvatar(buildDefaultAvatarUrl(fullName));
       onComplete();
     } catch {
       setError('We could not save the default profile picture. Please try again.');

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import { supabase } from '../lib/supabase';
 type Props = {
   userId: string;
   onComplete: () => void;
+  mode?: 'onboarding' | 'edit';
+  onCancel?: () => void;
 };
 
 const PRIMARY = '#4A90D9';
@@ -32,6 +34,32 @@ type AnswerKey =
   | 'cohabitation_tolerance_score';
 
 type Answers = Record<AnswerKey, string>;
+
+type PreferenceRecord = {
+  smokes: boolean | null;
+  uses_marijuana: boolean | null;
+  drinks_alcohol: boolean | null;
+  has_pets: boolean | null;
+  partner_stays_over: number | null;
+  ok_with_partners_staying: number | null;
+  study_or_wfh: boolean | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  move_in_date: string | null;
+  sleep_behavior_score: number | null;
+  sleep_tolerance_score: number | null;
+  clean_behavior_score: number | null;
+  clean_tolerance_score: number | null;
+  cooking_behavior_score: number | null;
+  cooking_tolerance_score: number | null;
+  noise_behavior_score: number | null;
+  noise_tolerance_score: number | null;
+  guest_behavior_score: number | null;
+  guest_tolerance_score: number | null;
+  conflict_behavior_score: number | null;
+  conflict_tolerance_score: number | null;
+  cohabitation_tolerance_score: number | null;
+};
 
 type OptionsStep = {
   type?: 'options';
@@ -284,6 +312,54 @@ const EMPTY_ANSWERS: Answers = {
   budget_max: '',
 } as Answers;
 
+const booleanAnswer = (value: boolean | null): string => (value ? 'yes' : 'no');
+
+const scoreAnswer = (value: number | null): string => (
+  typeof value === 'number' ? String(value) : ''
+);
+
+const moveInAnswer = (value: string | null): string => {
+  if (!value) return '3mo';
+
+  const target = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return '3mo';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
+
+  if (days <= 30) return '1mo';
+  if (days <= 90) return '3mo';
+  if (days <= 180) return '6mo';
+  return '6plus';
+};
+
+const existingPreferenceToAnswers = (preference: PreferenceRecord): Answers => ({
+  smokes: booleanAnswer(preference.smokes),
+  uses_marijuana: booleanAnswer(preference.uses_marijuana),
+  drinks_alcohol: booleanAnswer(preference.drinks_alcohol),
+  has_pets: booleanAnswer(preference.has_pets),
+  partner_stays_over: scoreAnswer(preference.partner_stays_over),
+  ok_with_partners_staying: scoreAnswer(preference.ok_with_partners_staying),
+  study_or_wfh: booleanAnswer(preference.study_or_wfh),
+  budget_min: preference.budget_min ? String(preference.budget_min) : '',
+  budget_max: preference.budget_max ? String(preference.budget_max) : '',
+  move_in: moveInAnswer(preference.move_in_date),
+  sleep_behavior_score: scoreAnswer(preference.sleep_behavior_score),
+  sleep_tolerance_score: scoreAnswer(preference.sleep_tolerance_score),
+  clean_behavior_score: scoreAnswer(preference.clean_behavior_score),
+  clean_tolerance_score: scoreAnswer(preference.clean_tolerance_score),
+  cooking_behavior_score: scoreAnswer(preference.cooking_behavior_score),
+  cooking_tolerance_score: scoreAnswer(preference.cooking_tolerance_score),
+  noise_behavior_score: scoreAnswer(preference.noise_behavior_score),
+  noise_tolerance_score: scoreAnswer(preference.noise_tolerance_score),
+  guest_behavior_score: scoreAnswer(preference.guest_behavior_score),
+  guest_tolerance_score: scoreAnswer(preference.guest_tolerance_score),
+  conflict_behavior_score: scoreAnswer(preference.conflict_behavior_score),
+  conflict_tolerance_score: scoreAnswer(preference.conflict_tolerance_score),
+  cohabitation_tolerance_score: scoreAnswer(preference.cohabitation_tolerance_score),
+});
+
 const describeSaveError = (saveError: unknown): string => {
   if (saveError instanceof Error) {
     return saveError.message;
@@ -310,11 +386,55 @@ const describeSaveError = (saveError: unknown): string => {
   return 'Unknown save error.';
 };
 
-export default function QuestionnaireScreen({ userId, onComplete }: Props) {
+export default function QuestionnaireScreen({
+  userId,
+  onComplete,
+  mode = 'onboarding',
+  onCancel,
+}: Props) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answers>(EMPTY_ANSWERS);
+  const [loadingExisting, setLoadingExisting] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (mode !== 'edit') return;
+
+    let active = true;
+
+    const loadExistingPreferences = async () => {
+      setLoadingExisting(true);
+      setError('');
+
+      try {
+        const { data, error: loadError } = await supabase
+          .from('lifestyle_preferences')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle<PreferenceRecord>();
+
+        if (loadError) throw loadError;
+        if (active && data) {
+          setAnswers(existingPreferenceToAnswers(data));
+        }
+      } catch (loadError) {
+        if (active) {
+          setError(`Could not load your saved preferences. ${describeSaveError(loadError)}`);
+        }
+      } finally {
+        if (active) {
+          setLoadingExisting(false);
+        }
+      }
+    };
+
+    void loadExistingPreferences();
+
+    return () => {
+      active = false;
+    };
+  }, [mode, userId]);
 
   const current = STEPS[step];
   const isBudgetStep = current.type === 'budget_range';
@@ -426,10 +546,19 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.brand}>
           <Text style={styles.logo}>HabiMatch</Text>
-          <Text style={styles.tagline}>Help us find your perfect match</Text>
+          <Text style={styles.tagline}>
+            {mode === 'edit' ? 'Update your roommate preferences' : 'Help us find your perfect match'}
+          </Text>
         </View>
 
         <View style={styles.card}>
+          {loadingExisting ? (
+            <View style={styles.loadingBlock}>
+              <ActivityIndicator color={PRIMARY} />
+              <Text style={styles.loadingText}>Loading saved preferences...</Text>
+            </View>
+          ) : (
+            <>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
           </View>
@@ -519,7 +648,19 @@ export default function QuestionnaireScreen({ userId, onComplete }: Props) {
               </View>
             ) : null}
           </View>
+            </>
+          )}
         </View>
+
+        {mode === 'edit' && onCancel ? (
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={onCancel}
+            disabled={saving}
+          >
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -560,6 +701,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 8,
+  },
+  loadingBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 180,
+  },
+  loadingText: {
+    color: '#666',
+    fontSize: 14,
+    marginTop: 10,
   },
   question: { fontSize: 20, fontWeight: '700', color: '#111', lineHeight: 28, marginBottom: 24 },
   options: { gap: 10 },
@@ -618,4 +769,15 @@ const styles = StyleSheet.create({
   },
   nextBtnDisabled: { opacity: 0.4 },
   nextBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  cancelBtn: {
+    alignSelf: 'center',
+    marginTop: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  cancelBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });
