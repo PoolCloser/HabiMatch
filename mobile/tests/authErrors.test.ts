@@ -21,6 +21,25 @@ describe('formatAuthError', () => {
     );
   });
 
+  test('returns concise copy for known sign-up failures', () => {
+    const cases = [
+      ['User already registered', 'An account with this email already exists.'],
+      ['Password should be at least 6 characters', 'Password does not meet requirements.'],
+      ['signup_disabled', 'Sign up is disabled. Contact support.'],
+    ] as const;
+
+    for (const [message, expected] of cases) {
+      assert.equal(formatAuthError(authError(message)), expected);
+    }
+  });
+
+  test('matches known errors case-insensitively', () => {
+    assert.equal(
+      formatAuthError(authError('INVALID LOGIN CREDENTIALS')),
+      'Invalid email or password.',
+    );
+  });
+
   test('preserves unknown auth messages', () => {
     assert.equal(
       formatAuthError(authError('Rate limit exceeded. Try again later.')),

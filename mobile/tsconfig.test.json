@@ -14,6 +14,7 @@
   "include": [
     "src/lib/authErrors.ts",
     "src/lib/matching.ts",
+    "src/lib/messagingPreview.ts",
     "tests/**/*.ts"
   ],
   "exclude": [

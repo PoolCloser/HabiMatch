@@ -3,7 +3,7 @@
 **Product:** HabiMatch 1.0  
 **Author:** Koa Wolfe -- Product Owner  
 **Release target:** June 2, 2026  
-**Last revised:** May 18, 2026
+**Last revised:** June 2, 2026
 
 ## Product Vision
 
@@ -11,8 +11,8 @@ HabiMatch helps people find compatible roommates by collecting lifestyle,
 housing, and cohabitation preferences, then ranking potential roommates by
 compatibility. The 1.0 MVP should feel like a focused roommate-matching app:
 create an account, complete onboarding, answer the questionnaire, review ranked
-roommate cards, save discovery decisions, receive mutual-match notifications,
-and message matches.
+roommate cards, save discovery decisions, see in-app mutual-match feedback, and
+message matches.
 
 This document was written for the direction of the engineering
 team. It defines the MVP feature scope, user flows, screen-level expectations,
@@ -38,20 +38,19 @@ admin tooling, or web-only workflows.
 | Linear onboarding | Implemented | Basic Info -> Profile Photo -> Questionnaire -> Home. |
 | Basic profile info | Implemented | Name, location, birth date, and binary gender. |
 | Profile photo setup | Implemented | Upload from library or skip with default avatar. |
-| Lifestyle questionnaire | Implemented, update required | One question at a time. Cigarette, marijuana, and alcohol questions should collect self-use only. |
-| Compatibility scoring | Implemented, update required | Python backend algorithm and TypeScript mobile mirror must stay aligned; substance-use hard filters should be removed. |
+| Lifestyle questionnaire | Implemented | One question at a time. Cigarette, marijuana, and alcohol questions collect self-use only. |
+| Compatibility scoring | Implemented | Python backend algorithm and TypeScript mobile mirror must stay aligned; substance-use choices are not hard filters. |
 | Roommate feed | Implemented | Shows one top ranked card at a time from up to 8 ranked candidates. |
 | Like/dislike decisions | Implemented | Saves to `discovery_decisions` and removes the card. |
-| Gender and age filters | Implemented | Client-side filters on ranked feed. |
-| Substance-use feed filters | Planned for 1.0 | Let users hide profiles based on cigarette, marijuana, or alcohol use. |
-| Profile editing | Implemented | Edit display name, bio, location, and avatar. |
-| Mutual match detection | Planned for 1.0 | A mutual like should create a match relationship. |
-| Match notifications | Planned for 1.0 | Notify users when a mutual match occurs. |
-| Direct messaging | Planned for 1.0 | Let mutual matches exchange messages. |
-| Group chat / roommate planning | Planned for 1.0 | Support group conversation or sharing when planning rooms larger than two people. |
-| Messaging tab | Planned for 1.0 | Currently disabled placeholder; must become the chat entry point. |
+| Gender, age, and lifestyle filters | Implemented | Client-side filters on ranked feed, including substance-use and pet-owner visibility filters. |
+| Profile editing | Implemented | Edit display name, bio, location, avatar, and questionnaire preferences. |
+| Mutual match detection | Implemented | A mutual like creates or reveals a match relationship and shows in-app feedback. |
+| Match notifications | Not implemented | Push/local notifications remain backlog scope. In-app match notice exists. |
+| Direct messaging | Implemented | Let mutual matches exchange messages. |
+| Group chat / roommate planning | Implemented | Support group conversations with eligible mutual matches. |
+| Messaging tab | Implemented | Chat entry point for mutual matches, direct conversations, and groups. |
 | Delete account | Placeholder | Visible but disabled. |
-| Questionnaire editing | Deferred | Not available after onboarding. |
+| Questionnaire editing | Implemented | Available from the Profile tab with existing answer prefill. |
 
 ## Core Product Rules
 
@@ -90,8 +89,13 @@ admin tooling, or web-only workflows.
 7. If `questionnaire_complete` is false, the user completes the questionnaire.
 8. When onboarding is complete, the user enters Home.
 9. Home defaults to the Roommate Feed.
-10. The user can filter, refresh, like, dislike, or switch to Profile.
-11. The user can edit limited profile fields or sign out from Profile.
+10. The user can filter, pull to refresh, like, dislike, or switch tabs.
+11. A mutual like shows an in-app match notice and the matched user appears in
+    Messages.
+12. The user can open Messages to chat with direct matches or create a group
+    conversation.
+13. The user can edit profile fields, update questionnaire preferences, or sign
+    out from Profile settings.
 
 ## Screen Specifications
 
@@ -288,7 +292,7 @@ Final onboarding step and the core source of matching data.
 - `Back`, `Next`, and `Finish` buttons.
 - Error banner and saving spinner.
 
-**PO guidance:** The questionnaire is the most product-critical onboarding
+**PO notes:** The questionnaire is the most product-critical onboarding
 surface. Keep copy conversational and avoid exposing internal numeric values.
 Substance-use tolerance questions should not appear in the questionnaire; user
 control for those preferences belongs in the Roommate Feed filter panel. Any new
@@ -313,7 +317,7 @@ Primary post-onboarding screen. Shows ranked roommate recommendations.
   substance-use filters.
 - Saves like/dislike decisions to `discovery_decisions`.
 - Removes decided cards immediately.
-- Supports manual refresh.
+- Supports pull-to-refresh.
 
 **Feed card content:**
 
@@ -359,16 +363,14 @@ Primary post-onboarding screen. Shows ranked roommate recommendations.
 - Score pill.
 - Photo area.
 - Info rows.
-- Circular dislike and like action buttons.
+- Swipe gestures with directional accept/reject feedback.
 - Error banners.
-- Refresh button.
 - Bottom tab bar with Messages, Feed, and Profile.
 
-**PO guidance:** The feed is intentionally card-forward and lightweight.
+**PO notes:** The feed is intentionally card-forward and lightweight.
 Pagination, undo, and detailed compatibility explanations are not required for
-1.0. Mutual-match and chat entry points are required for 1.0, but they should be
-added through the dedicated messaging and notification scope rather than as
-ad-hoc feed behavior.
+1.0. Mutual-match feedback should stay short and should direct users to
+Messages instead of expanding the feed into a chat surface.
 
 ### 9. Home / Profile Screen
 
@@ -381,9 +383,10 @@ Profile tab inside Home.
 - Lets the user edit display name, bio, and location.
 - Requires display name and location before saving.
 - Saves profile edits to Supabase.
-- Supports sign out.
+- Opens questionnaire edit mode with existing preference prefill.
+- Supports sign out from the Profile settings modal.
 - Shows Delete Account as disabled.
-- Settings icon is visible but disabled.
+- Settings icon opens account actions.
 
 **Editable fields:**
 
@@ -391,51 +394,48 @@ Profile tab inside Home.
 - Bio.
 - Location.
 - Profile photo.
+- Questionnaire responses.
 
 **Not editable in MVP 1.0:**
 
 - Email address.
 - Birth date.
 - Gender.
-- Questionnaire responses.
 - Discovery decisions.
 
 **UI elements:**
 
-- Top bar with `HM` and disabled settings icon.
+- Top bar with `HM` and settings icon.
 - Large circular avatar with camera badge.
 - Profile name and metadata.
 - Text inputs for display name, bio, and location.
 - Save profile button.
-- Sign out button.
-- Disabled Delete Account action.
+- Update Preferences button.
+- Profile settings modal.
+- Sign out action.
+- Disabled Delete Account action with explanatory hint.
 - Success and error messages.
-
-**PO guidance:** Do not add questionnaire re-entry from this screen for MVP 1.0.
-That requires a separate design decision because changing preferences can affect
-matching, existing discovery decisions, and feed expectations.
 
 ### 10. Messages Tab
 
-The Messages tab is present in the bottom navigation and is currently disabled.
-For 1.0, it must become the entry point for direct and group messaging between
-matched users.
+The Messages tab is present in the bottom navigation and is the entry point for
+direct and group messaging between matched users.
 
-**Planned 1.0 behavior:**
+**Feature behavior:**
 
 - Users can open Messages from the bottom navigation after onboarding.
 - Users can only start or view conversations with mutual matches.
 - A mutual match is created when the current user likes a profile that has
   already liked them, or when another user later likes them back.
-- Conversation lists should show the match name, avatar, last message preview,
-  and most recent activity time.
-- Direct message threads should show sent and received messages in chronological
+- Conversation lists show match name or group name, avatar or group icon, last
+  message preview, participant count for groups, and most recent activity time.
+- Direct message threads show sent and received messages in chronological
   order.
-- Sending a message should persist the message and update the conversation's
-  latest activity.
-- Group chat or multi-roommate planning should support conversations involving
-  more than two matched users if Sprint 3 scope remains unchanged.
-- Empty states should distinguish between no mutual matches and no messages yet.
+- Sending a message persists the message and updates the conversation's latest
+  activity.
+- Group chat supports conversations involving more than two matched users.
+- Group creation only allows eligible mutual matches.
+- Empty states distinguish between no mutual matches and no messages yet.
 
 **UI elements:**
 
@@ -446,6 +446,8 @@ matched users.
 - Message bubbles for sent and received messages.
 - Text composer.
 - Send button.
+- New group button.
+- Group name input and selectable participant list.
 - Loading, empty, and error states.
 
 **PO guidance:** Do not ship fake or local-only messages. Messaging must persist
@@ -453,10 +455,11 @@ to the backend/Supabase data model and must be limited to mutual matches.
 
 ### 11. Match Notifications
 
-Notifications are planned for the 1.0 release and should alert users when a
-mutual match is created.
+Push notifications are not implemented in the current release. The app provides
+in-app feedback when a mutual match is created, and push/local notification
+support remains backlog scope.
 
-**Planned 1.0 behavior:**
+**Future behavior:**
 
 - The app requests notification permission at a contextually appropriate time,
   not immediately on first launch.
@@ -473,7 +476,7 @@ mutual match is created.
 - In-app success path for newly created mutual matches.
 - Notification deep-link target if supported by the final implementation.
 
-**PO guidance:** Notifications support the matching loop but should not block
+**PO notes:** Notifications support the matching loop but should not block
 core app use. Do not require notification permission before onboarding, feed
 use, liking, or messaging.
 
@@ -516,8 +519,6 @@ home, scaled by noise sensitivity, then all weights are normalized.
 
 **PO rules:**
 
-- Remaining hard filters stay absolute unless the PO explicitly changes the
-  matching strategy.
 - Cigarette smoking, marijuana use, and alcohol use must not produce
   compatibility failures or `Filtered` labels by themselves.
 - Substance-use preferences belong in the Roommate Feed filters so each user can
@@ -543,17 +544,21 @@ The current app expects these Supabase resources:
 | `lifestyle_preferences` | Questionnaire responses used for compatibility scoring. |
 | `discovery_decisions` | Current user's like/dislike decisions for candidate profiles. |
 | `profile-photos` | Supabase storage bucket for uploaded avatar images. |
+| `conversations` | Direct and group conversation metadata. |
+| `participants` | Users participating in each conversation. |
+| `messages` | Persisted chat messages, exposed to realtime updates. |
 
-Substance-use fields should store whether the user smokes cigarettes, uses
-marijuana, or drinks alcohol at home. The legacy tolerance fields for those
-habits should not drive 1.0 matching once the questionnaire and matching update
-is complete.
+Substance-use fields store whether the user smokes cigarettes, uses marijuana,
+or drinks alcohol at home. The legacy tolerance fields for those habits should
+not drive 1.0 matching.
 
-Planned 1.0 messaging and notification work will also need persistent resources
-for mutual matches, conversations, messages, conversation participants, and
-notification tokens or delivery preferences. Exact table names are an
-engineering decision, but the data model must enforce that only matched users
-can participate in direct conversations.
+Mutual matches are derived from reciprocal `like` rows in
+`discovery_decisions`. Direct and group messaging use Supabase RPCs and RLS so
+only conversation participants can view messages, and direct/group conversation
+creation is limited to eligible mutual matches.
+
+Future push notification work will need persistent notification tokens or
+delivery preferences. That storage is not part of the current release.
 
 **PO guidance:** Keep user-owned data protected by row-level security. Completed
 profiles must be readable enough to power the feed, but users should only be
@@ -569,6 +574,11 @@ The backend is a FastAPI app with:
 - Protected compatibility route under `/matching/compatibility`.
 - A legacy/mock `/feed` endpoint that should not be treated as the implemented
   production feed source.
+
+Supabase RPCs and policies support the implemented mobile-first flows for
+completed profile reads, discovery decisions, mutual-match checks, direct
+conversation creation, group conversation creation, conversation listing, and
+realtime message delivery.
 
 **PO guidance:** The backend matching endpoint is useful for validation and
 future server-side ranking. For the current MVP mobile flow, the feed is driven
@@ -593,27 +603,28 @@ by Supabase reads plus the TypeScript matching mirror.
 
 ## Release Plan Reconciliation
 
-The release plan remains useful for roadmap context. Because HabiMatch is still
-pre-1.0, this design document distinguishes the implemented pre-release feature
-set from the remaining planned 1.0 scope.
+The release plan remains useful for roadmap context. This design document now
+distinguishes implemented 1.0 MVP behavior from remaining backlog scope.
 
 | Release-plan item | 1.0 decision |
 |---|---|
-| Mutual match notifications | Planned for 1.0. Not implemented yet. |
-| Direct messaging | Planned for 1.0. Messages tab is currently disabled until implemented. |
-| Group chat | Planned for 1.0 if Sprint 3 scope remains unchanged. |
-| Profile and match preferences editable at any time | Partially implemented. Profile fields are editable; questionnaire responses are not. |
-| Advanced filters | Expanded for 1.0. Age and gender filters exist; cigarette, marijuana, and alcohol filters should be added. |
+| Mutual match notifications | In-app mutual match notice is implemented. Push/local notifications remain backlog scope. |
+| Direct messaging | Implemented for mutual matches. |
+| Group chat | Implemented for eligible mutual matches. |
+| Profile and match preferences editable at any time | Implemented for display name, bio, location, avatar, and questionnaire preferences. Birth date, gender, email, and discovery decisions are not editable. |
+| Advanced filters | Implemented for age, gender, substance-use visibility, and pet-owner visibility. Filter persistence remains backlog scope. |
 | Web app | Deferred as a product target, though Expo web preview may be used for development/demo. |
-| NumPy algorithm math | Not used in current implementation. Matching uses Python standard math and a TypeScript mirror. |
+| Algorithm math | Matching uses Python standard math and a TypeScript mirror. |
 | EAS distribution | Planned release path, not a screen-level MVP feature. |
 
 ## Engineering Guidance from PO
 
 - Prioritize correctness and trust over feature breadth. A smaller accurate
   matching flow is better than a broader but inconsistent app.
-- Build messaging and notifications as scoped 1.0 features, not as mock
-  placeholder behavior.
+- Keep messaging persistent and mutual-match gated; do not add local-only or
+  fake chat behavior.
+- Treat push notifications as separate backlog scope until permission handling,
+  token storage, delivery, and user controls are designed and tested.
 - Keep onboarding linear until the team designs re-entry and partial-completion
   behavior.
 - Treat questionnaire changes as cross-stack changes, not mobile-only copy work.
@@ -622,8 +633,6 @@ set from the remaining planned 1.0 scope.
 - Keep the UI consistent: blue brand background for onboarding, white cards,
   clear selected states, obvious disabled states, and short direct copy.
 - Preserve the disabled Delete Account affordance as a visible roadmap signal.
-  The Messages affordance should become interactive when the 1.0 messaging scope
-  is implemented.
 - Update `documentation/DOD.md` and `documentation/questionnaire_design.md`
   whenever the quality bar or matching behavior changes.
 
@@ -633,3 +642,5 @@ set from the remaining planned 1.0 scope.
 - [questionnaire_design.md](questionnaire_design.md) - Questionnaire order,
   stored fields, hard filters, scoring formulas, and domain weights.
 - [style_guide.md](style_guide.md) - Code style and implementation standards.
+- [test_plan_and_report.md](test_plan_and_report.md) - System scenarios,
+  automated test coverage, and release test results.

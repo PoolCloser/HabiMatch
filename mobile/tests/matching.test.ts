@@ -82,6 +82,38 @@ describe('calculateCompatibility', () => {
     });
   });
 
+  test('fails when move-in timelines are too far apart', () => {
+    const result = calculateCompatibility(
+      participant('left', { moveInDate: '2026-08-01' }),
+      participant('right', { moveInDate: '2026-11-01' }),
+    );
+
+    assert.equal(result.passedFilters, false);
+    assert.equal(result.overallScore, 0);
+    assert.deepEqual(result.failures, ['Move-in timelines are too far apart.']);
+  });
+
+  test('reports every hard-filter failure', () => {
+    const result = calculateCompatibility(
+      participant('left', {
+        budgetMin: 1000,
+        budgetMax: 1300,
+        moveInDate: '2026-08-01',
+      }),
+      participant('right', {
+        budgetMin: 1500,
+        budgetMax: 2000,
+        moveInDate: '2026-11-01',
+      }),
+    );
+
+    assert.equal(result.passedFilters, false);
+    assert.deepEqual(result.failures, [
+      'Budget ranges do not overlap.',
+      'Move-in timelines are too far apart.',
+    ]);
+  });
+
   test('does not fail on lifestyle choices that are controlled by feed filters', () => {
     const result = calculateCompatibility(
       participant('left', {
@@ -116,5 +148,29 @@ describe('calculateCompatibility', () => {
     assert.equal(result.domains.logistics, 0.5);
     assert.ok(result.overallScore > 0);
     assert.ok(result.overallScore < 1);
+  });
+
+  test('weights noise mismatch more heavily when a sensitive roommate works from home', () => {
+    const basePreferences: Partial<MatchPreferences> = {
+      noiseToleranceScore: 1,
+    };
+    const noisyPreferences: Partial<MatchPreferences> = {
+      noiseBehaviorScore: 4,
+    };
+
+    const withoutWfh = calculateCompatibility(
+      participant('left', basePreferences),
+      participant('right', noisyPreferences),
+    );
+    const withWfh = calculateCompatibility(
+      participant('left', { ...basePreferences, studyOrWfh: true }),
+      participant('right', noisyPreferences),
+    );
+
+    assert.equal(withoutWfh.passedFilters, true);
+    assert.equal(withWfh.passedFilters, true);
+    assert.equal(withoutWfh.domains.noise, withWfh.domains.noise);
+    assert.ok(withWfh.domains.noise < 1);
+    assert.ok(withWfh.overallScore < withoutWfh.overallScore);
   });
 });
