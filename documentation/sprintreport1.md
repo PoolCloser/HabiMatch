@@ -12,9 +12,7 @@ We should also stop treating big pieces of work like authentication as a single 
 
 ## Actions to Start Doing
 
-We should start setting up the shared development environment and tools on day one so that everyone can work in parallel instead of waiting on the backend to be ready.
-
-We should also start writing clearer acceptance criteria for each task so that we all agree on what counts as done. For example, instead of saying a task is just registration, we should say whether that includes the API, the password hashing, the validation, and the UI.
+We should also start writing clearer acceptance criteria for each task so that we all agree on what counts as done. For example, instead of saying a task is just registration, we should say whether that includes the API, the validation, etc.
 
 For the next sprint, we should check in earlier on tasks that block other people. The database schema and authentication were both things that the UI work depended on, and a quicker check-in would have helped the frontend get started sooner.
 
@@ -24,7 +22,6 @@ We should keep pairing up on the harder backend pieces. Pairing on authenticatio
 
 We should also keep using a shared design document for the questionnaire and profile structure. Having the lifestyle questions written down ahead of time made it much easier to build the questionnaire UI and the profile endpoint.
 
-We should keep prioritizing the foundation first. Registration, login, and profile creation are the base that everything else in HabiMatch sits on, so it was the right call to focus on them this sprint.
 
 ## Definition of Done
 
