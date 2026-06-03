@@ -17,10 +17,11 @@ describe('profile edit contract', () => {
     assert.match(source, /Profile settings/);
     assert.match(source, /handleSignOut/);
     assert.match(source, /Delete account/);
+    assert.match(source, /handleDeleteAccount/);
 
-    const profileBody = source.split('Profile settings', 1)[0];
-    assert.doesNotMatch(profileBody, /Sign out/);
-    assert.doesNotMatch(profileBody, /Delete account/);
+    const profileBody = source.split('<Text style={styles.settingsTitle}>Profile settings</Text>', 1)[0];
+    assert.doesNotMatch(profileBody, /<Text style={styles\.settingsActionText}>Sign out<\/Text>/);
+    assert.doesNotMatch(profileBody, /<Text style={styles\.deleteActionText}>Delete account<\/Text>/);
   });
 
   test('lets the profile tab launch questionnaire preference updates', () => {

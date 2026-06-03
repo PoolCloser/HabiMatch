@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
   Modal,
@@ -16,6 +17,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
+import { deleteAccount } from '../lib/deleteAccount';
+import { getErrorMessage } from '../lib/errors';
 import { uploadProfilePhoto } from '../lib/profilePhotos';
 import { checkMutualMatch } from '../lib/messaging';
 import MessagesScreen, { type ChatTarget } from './MessagesScreen';
@@ -144,6 +147,8 @@ const PREFERENCE_COLUMNS = [
 
 export default function HomeScreen() {
   const [signingOut, setSigningOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState('');
   const [loadingMatches, setLoadingMatches] = useState(true);
   const [refreshingFeed, setRefreshingFeed] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -327,6 +332,35 @@ export default function HomeScreen() {
     } finally {
       setSigningOut(false);
     }
+  };
+
+  const confirmDeleteAccount = async () => {
+    setAuthError('');
+    setDeleteAccountError('');
+    setDeletingAccount(true);
+    try {
+      await deleteAccount();
+      setShowProfileSettings(false);
+    } catch (deleteFailure) {
+      const detail = getErrorMessage(deleteFailure, 'Could not delete your account.');
+      setDeleteAccountError(detail);
+      setAuthError(detail);
+      Alert.alert('Could not delete account', detail);
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    setDeleteAccountError('');
+    Alert.alert(
+      'Delete account?',
+      'This permanently removes your profile, photos, matches, and messages. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete account', style: 'destructive', onPress: () => void confirmDeleteAccount() },
+      ],
+    );
   };
 
   const handleSaveProfile = async () => {
@@ -956,12 +990,12 @@ export default function HomeScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.settingsAction, signingOut && styles.btnDisabled]}
+              style={[styles.settingsAction, (signingOut || deletingAccount) && styles.btnDisabled]}
               onPress={() => {
                 setShowProfileSettings(false);
                 void handleSignOut();
               }}
-              disabled={signingOut}
+              disabled={signingOut || deletingAccount}
             >
               {signingOut ? (
                 <ActivityIndicator color={PRIMARY} />
@@ -973,12 +1007,29 @@ export default function HomeScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.settingsAction, styles.deleteSettingsAction]} disabled>
-              <Ionicons name="trash-outline" size={20} color="#B42318" />
-              <Text style={styles.deleteActionText}>Delete account</Text>
+            <TouchableOpacity
+              style={[
+                styles.settingsAction,
+                styles.deleteSettingsAction,
+                deletingAccount && styles.btnDisabled,
+              ]}
+              onPress={handleDeleteAccount}
+              disabled={deletingAccount}
+            >
+              {deletingAccount ? (
+                <ActivityIndicator color="#B42318" />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={20} color="#B42318" />
+                  <Text style={styles.deleteActionText}>Delete account</Text>
+                </>
+              )}
             </TouchableOpacity>
+            {deleteAccountError ? (
+              <Text style={styles.settingsError}>{deleteAccountError}</Text>
+            ) : null}
             <Text style={styles.settingsHint}>
-              Account deletion needs backend support before it can be enabled.
+              Deleting your account is permanent and cannot be undone.
             </Text>
           </View>
         </View>
@@ -1659,12 +1710,17 @@ const styles = StyleSheet.create({
   deleteSettingsAction: {
     borderColor: '#FAD4D0',
     backgroundColor: '#FFF7F6',
-    opacity: 0.65,
   },
   settingsHint: {
     color: MUTED,
     fontSize: 12,
     lineHeight: 17,
+  },
+  settingsError: {
+    color: '#B42318',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
   },
   tabBar: {
     position: 'absolute',

@@ -84,3 +84,30 @@ export async function uploadProfilePhoto(userId: string, asset: ImageAsset): Pro
 
   return publicUrlData.publicUrl;
 }
+
+export async function deleteProfilePhotos(userId: string): Promise<void> {
+  const { data: files, error: listError } = await supabase.storage
+    .from('profile-photos')
+    .list(userId);
+
+  if (listError) {
+    const message = listError.message.toLowerCase();
+    if (message.includes('not found') || message.includes('does not exist')) {
+      return;
+    }
+    throw listError;
+  }
+
+  const paths = (files ?? [])
+    .filter(file => file.name && file.id !== null)
+    .map(file => `${userId}/${file.name}`);
+
+  if (paths.length === 0) {
+    return;
+  }
+
+  const { error: removeError } = await supabase.storage.from('profile-photos').remove(paths);
+  if (removeError) {
+    throw removeError;
+  }
+}

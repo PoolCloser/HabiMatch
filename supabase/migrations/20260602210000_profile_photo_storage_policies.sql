@@ -1,6 +1,4 @@
--- Fixes "New row violates row-level security policy" on profile photo upload.
--- Canonical copy: supabase/migrations/20260602210000_profile_photo_storage_policies.sql
-
+-- Profile photo bucket + storage RLS for mobile uploads (path: {user_id}/...).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'profile-photos',
