@@ -9,7 +9,7 @@
 | Team name | Team HabiMatch |
 | Sprint completion date | April 21, 2026 |
 | Revision number | 1.0 |
-| Revision date | April 7, 2026 |
+| Revision date | April 8, 2026 |
 
 ## Goal
 
@@ -54,10 +54,10 @@ User stories are listed in priority order, most important first.
 | Team member | Role(s) for this sprint |
 |---|---|
 | Mary Tarevern | Scrum Master, Backend Developer |
-| Koa Wolfe | Backend Developer |
+| Koa Wolfe | Product Owner, Backend Developer |
 | Drake Griffin | Frontend Developer |
 | James Yeh | Frontend Developer |
-| Ethan Nguyen | Product Owner, Full-stack Developer |
+| Ethan Nguyen | Full-stack Developer |
 
 ## Initial Task Assignment
 
@@ -96,13 +96,16 @@ Sprint 1, HabiMatch. The physical scrum (task) board is posted in the lab and la
 
 ## Scrum Times
 
-The team will hold Scrum meetings at the following times each week. The TA or tutor will visit the Friday lab time meeting, as arranged.
+Monday: 
+4:00PM - 5:00PM: TA Meeting
+5:00PM - 5:30PM: Team meeting
 
-| Day | Time | Notes |
-|---|---|---|
-| Monday | 10:00 to 10:15 AM | Daily Scrum (stand-up) |
-| Wednesday | 10:00 to 10:15 AM | Daily Scrum (stand-up) |
-| Friday | 2:00 to 3:00 PM | Lab time Scrum, TA or tutor visits |
+Thursday:
+1:30PM - 2:30 PM: Team meeting
+
+Friday: 
+3:00 PM - 4:00 PM: Team meeting
+
 
 ## Release Plan
 
