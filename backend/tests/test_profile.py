@@ -174,6 +174,7 @@ class TestAuth:
 
     def test_token_missing_sub(self):
         app.dependency_overrides.clear()
-        with patch("backend.models.auth.jwt.decode", return_value={}):
+        with patch("backend.models.auth._get_jwks", return_value={}), \
+            patch("backend.models.auth.jwt.decode", return_value={}):
             response = client.get("/profile/", headers={"Authorization": "Bearer nosubtoken"})
-        assert response.status_code == 500
+        assert response.status_code == 401

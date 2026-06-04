@@ -1,12 +1,10 @@
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.models.database import get_db
 from backend.models.models import Profile
 from backend.models.schemas import ProfileCreate, ProfileUpdate, ProfileResponse
-from backend.models.auth import require_auth
+from backend.models.auth import authenticated_user_id, require_auth
 
 router = APIRouter(tags=["Profile"])
 
@@ -17,7 +15,7 @@ def create_profile(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_auth),
 ):
-    user_id = UUID(current_user["sub"])
+    user_id = authenticated_user_id(current_user)
     existing = db.query(Profile).filter(Profile.id == user_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="Profile already exists. Use PUT to update.")
@@ -34,7 +32,7 @@ def update_profile(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_auth),
 ):
-    user_id = UUID(current_user["sub"])
+    user_id = authenticated_user_id(current_user)
     profile = db.query(Profile).filter(Profile.id == user_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -50,7 +48,7 @@ def get_profile(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_auth),
 ):
-    user_id = UUID(current_user["sub"])
+    user_id = authenticated_user_id(current_user)
     profile = db.query(Profile).filter(Profile.id == user_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
@@ -62,7 +60,7 @@ def delete_profile(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_auth),
 ):
-    user_id = UUID(current_user["sub"])
+    user_id = authenticated_user_id(current_user)
     profile = db.query(Profile).filter(Profile.id == user_id).first()
     if profile:
         db.delete(profile)

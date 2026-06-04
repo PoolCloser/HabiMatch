@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -10,7 +8,7 @@ from backend.models.schemas import (
     LifestylePreferencesResponse,
     LifestylePreferencesUpdate,
 )
-from backend.models.auth import require_auth
+from backend.models.auth import authenticated_user_id, require_auth
 
 router = APIRouter(tags=["Lifestyle"])
 
@@ -21,7 +19,7 @@ def create_lifestyle(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_auth),
 ):
-    user_id = UUID(current_user["sub"])
+    user_id = authenticated_user_id(current_user)
     existing = db.query(LifestylePreferences).filter(LifestylePreferences.user_id == user_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="Lifestyle preferences already exist. Use PUT to update.")
@@ -38,7 +36,7 @@ def update_lifestyle(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_auth),
 ):
-    user_id = UUID(current_user["sub"])
+    user_id = authenticated_user_id(current_user)
     lifestyle = db.query(LifestylePreferences).filter(LifestylePreferences.user_id == user_id).first()
     if not lifestyle:
         raise HTTPException(status_code=404, detail="Lifestyle preferences not found")
@@ -54,7 +52,7 @@ def get_lifestyle(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_auth),
 ):
-    user_id = UUID(current_user["sub"])
+    user_id = authenticated_user_id(current_user)
     lifestyle = db.query(LifestylePreferences).filter(LifestylePreferences.user_id == user_id).first()
     if not lifestyle:
         raise HTTPException(status_code=404, detail="Lifestyle preferences not found")

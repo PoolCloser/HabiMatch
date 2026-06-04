@@ -92,6 +92,16 @@ type RankedMatch = {
 };
 
 type DiscoveryDecision = 'like' | 'dislike';
+type GenderFilter = Exclude<Gender, null>;
+type MatchFilters = {
+  gender: GenderFilter | null;
+  ageMin: string;
+  ageMax: string;
+  hideSmokers: boolean;
+  hideMarijuanaUsers: boolean;
+  hideAlcoholUsers: boolean;
+  hidePetOwners: boolean;
+};
 
 const PRIMARY = '#4A90D9';
 const TEXT = '#111827';
@@ -101,6 +111,8 @@ const CARD = '#FFFFFF';
 type DashboardTab = 'feed' | 'messages' | 'profile';
 const SWIPE_THRESHOLD = 110;
 const SWIPE_OUT_DISTANCE = 520;
+
+const GENDER_FILTER_OPTIONS: GenderFilter[] = ['man', 'woman'];
 
 const DOMAIN_LABELS: Record<DomainKey, string> = {
   logistics: 'Logistics',
@@ -169,7 +181,7 @@ export default function HomeScreen() {
   const [editingPreferences, setEditingPreferences] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [genderFilter, setGenderFilter] = useState<'man' | 'woman' | null>(null);
+  const [genderFilter, setGenderFilter] = useState<GenderFilter | null>(null);
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
   const [hideSmokers, setHideSmokers] = useState(false);
@@ -486,18 +498,27 @@ export default function HomeScreen() {
     hideAlcoholUsers ||
     hidePetOwners;
 
-  const filteredMatches = matches.filter(match => {
-    if (genderFilter && match.gender !== genderFilter) return false;
-    if (hideSmokers && match.smokes) return false;
-    if (hideMarijuanaUsers && match.usesMarijuana) return false;
-    if (hideAlcoholUsers && match.drinksAlcohol) return false;
-    if (hidePetOwners && match.hasPets) return false;
-    const parsedMin = parseInt(ageMin, 10);
-    const parsedMax = parseInt(ageMax, 10);
-    if (!isNaN(parsedMin) && match.age < parsedMin) return false;
-    if (!isNaN(parsedMax) && match.age > parsedMax) return false;
-    return true;
-  });
+  const filteredMatches = useMemo(
+    () => filterMatches(matches, {
+      gender: genderFilter,
+      ageMin,
+      ageMax,
+      hideSmokers,
+      hideMarijuanaUsers,
+      hideAlcoholUsers,
+      hidePetOwners,
+    }),
+    [
+      ageMax,
+      ageMin,
+      genderFilter,
+      hideAlcoholUsers,
+      hideMarijuanaUsers,
+      hidePetOwners,
+      hideSmokers,
+      matches,
+    ],
+  );
 
   const topMatch = filteredMatches[0] ?? null;
 
@@ -662,14 +683,14 @@ export default function HomeScreen() {
               <View style={styles.filterPanel}>
                 <Text style={styles.filterSectionLabel}>Gender</Text>
                 <View style={styles.filterPillRow}>
-                  {(['man', 'woman'] as const).map(g => (
+                  {GENDER_FILTER_OPTIONS.map(gender => (
                     <TouchableOpacity
-                      key={g}
-                      style={[styles.filterPill, genderFilter === g && styles.filterPillActive]}
-                      onPress={() => setGenderFilter(genderFilter === g ? null : g)}
+                      key={gender}
+                      style={[styles.filterPill, genderFilter === gender && styles.filterPillActive]}
+                      onPress={() => setGenderFilter(genderFilter === gender ? null : gender)}
                     >
-                      <Text style={[styles.filterPillText, genderFilter === g && styles.filterPillTextActive]}>
-                        {g.charAt(0).toUpperCase() + g.slice(1)}
+                      <Text style={[styles.filterPillText, genderFilter === gender && styles.filterPillTextActive]}>
+                        {titleCase(gender)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -689,7 +710,7 @@ export default function HomeScreen() {
                     }}
                     maxLength={3}
                   />
-                  <Text style={styles.ageRangeSep}>–</Text>
+                  <Text style={styles.ageRangeSep}>-</Text>
                   <TextInput
                     style={styles.ageRangeInput}
                     keyboardType="number-pad"
@@ -1170,10 +1191,35 @@ function optionalBoolean(value: boolean | null, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+function parseAgeFilter(value: string): number | null {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function filterMatches(matches: RankedMatch[], filters: MatchFilters): RankedMatch[] {
+  const parsedMin = parseAgeFilter(filters.ageMin);
+  const parsedMax = parseAgeFilter(filters.ageMax);
+
+  return matches.filter(match => {
+    if (filters.gender && match.gender !== filters.gender) return false;
+    if (filters.hideSmokers && match.smokes) return false;
+    if (filters.hideMarijuanaUsers && match.usesMarijuana) return false;
+    if (filters.hideAlcoholUsers && match.drinksAlcohol) return false;
+    if (filters.hidePetOwners && match.hasPets) return false;
+    if (parsedMin !== null && match.age < parsedMin) return false;
+    if (parsedMax !== null && match.age > parsedMax) return false;
+    return true;
+  });
+}
+
 function formatGender(gender: Gender): string {
   if (gender === 'man') return 'Man';
   if (gender === 'woman') return 'Woman';
   return 'Gender not shown';
+}
+
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function shortUserId(userId: string): string {
@@ -1201,7 +1247,9 @@ function displayProfileInitial(profile: ProfileRecord): string {
 }
 
 function formatBudget(min: number, max: number): string {
-  if (!min || !max) return 'Budget not shown';
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < min) {
+    return 'Budget not shown';
+  }
   return `$${min.toLocaleString()} - $${max.toLocaleString()}`;
 }
 

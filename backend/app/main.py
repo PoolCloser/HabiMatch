@@ -4,8 +4,8 @@ load_dotenv()
 
 from fastapi import FastAPI, Depends
 
-from app.matching import CompatibilityRequest, CompatibilityResponse, calculate_compatibility
-from app.middleware.auth import require_auth
+from .matching import CompatibilityRequest, CompatibilityResponse, calculate_compatibility
+from .middleware.auth import require_auth
 from backend.models.user_profile import router as profile_router
 from backend.models.lifestyle import router as lifestyle_router
 

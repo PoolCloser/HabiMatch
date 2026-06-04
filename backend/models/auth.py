@@ -1,4 +1,5 @@
 import os
+from uuid import UUID
 
 import httpx
 from jose import jwt, JWTError
@@ -29,7 +30,7 @@ def _get_jwks() -> dict:
 def require_auth(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> dict:
-    """FastAPI dependency — verifies the Supabase JWT and returns the decoded payload.
+    """Verify the Supabase JWT and return the decoded payload.
 
     Supports ECC (P-256) keys via JWKS. Raises 401 if the token is missing,
     expired, or has an invalid signature.
@@ -48,3 +49,13 @@ def require_auth(
             detail=str(exc),
         )
     return payload
+
+
+def authenticated_user_id(current_user: dict) -> UUID:
+    try:
+        return UUID(current_user["sub"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authenticated user.",
+        ) from exc

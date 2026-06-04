@@ -5,8 +5,8 @@ from cryptography.hazmat.primitives.asymmetric.ec import generate_private_key, S
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
 from fastapi.testclient import TestClient
 from jose import jwt as jose_jwt
-import app.middleware.auth as auth_module
-from app.main import app
+import backend.models.auth as auth_module
+from backend.app.main import app
 
 _private_key = generate_private_key(SECP256R1())
 _pub_numbers = _private_key.public_key().public_numbers()

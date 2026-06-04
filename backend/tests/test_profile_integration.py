@@ -7,13 +7,10 @@ from backend.app.main import app
 
 load_dotenv()
 
-os.environ["SUPABASE_URL"] = os.environ.get("EXPO_PUBLIC_SUPABASE_URL", "")
-os.environ["SUPABASE_KEY"] = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY", "")
+SUPABASE_URL = os.environ.get("EXPO_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY", "")
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_KEY"]
-
-if not SUPABASE_URL:
+if not SUPABASE_URL or not SUPABASE_KEY:
     pytest.skip("Supabase env vars not set — skipping integration tests", allow_module_level=True)
     
 client = TestClient(app)
