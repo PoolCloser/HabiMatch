@@ -71,18 +71,8 @@ User stories are listed in priority order, most important first.
 
 ## Initial Burnup Chart
 
-Sprint 1, HabiMatch. The physical, labeled burnup chart is posted in the lab. The total planned scope is 34 ideal hours over the two week sprint, and the planned (ideal) burnup rises from 0 to 34 at about 2.43 ideal hours per day. At the start of the sprint no work is completed yet.
+<img width="1024" height="624" alt="image" src="https://github.com/user-attachments/assets/add8c497-2f50-4b41-988a-159c67773ec5" />
 
-| Sprint day | Total scope (ideal hrs) | Planned (ideal) burnup |
-|---|---|---|
-| 0 | 34 | 0.0 |
-| 2 | 34 | 4.9 |
-| 4 | 34 | 9.7 |
-| 6 | 34 | 14.6 |
-| 8 | 34 | 19.4 |
-| 10 | 34 | 24.3 |
-| 12 | 34 | 29.1 |
-| 14 | 34 | 34.0 |
 
 ## Initial Scrum Board
 
