@@ -71,6 +71,18 @@ User stories are listed in priority order, most important first.
 
 ## Initial Burnup Chart
 
+
+| Sprint day | Total scope (ideal hrs) | Planned (ideal) burnup |
+|---|---|---|
+| 0 | 34 | 0.0 |
+| 2 | 34 | 4.9 |
+| 4 | 34 | 9.7 |
+| 6 | 34 | 14.6 |
+| 8 | 34 | 19.4 |
+| 10 | 34 | 24.3 |
+| 12 | 34 | 29.1 |
+| 14 | 34 | 34.0 |
+
 <img width="1024" height="624" alt="image" src="https://github.com/user-attachments/assets/add8c497-2f50-4b41-988a-159c67773ec5" />
 
 
