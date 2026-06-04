@@ -77,7 +77,6 @@ Each task sits in the same row as its user story. At the start of the sprint not
 
 
 
-
 ## Scrum Times
 
 **Monday**
