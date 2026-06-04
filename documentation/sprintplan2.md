@@ -73,6 +73,7 @@ Each task sits in the same row as its user story. At the start of the sprint not
 
 ## Burn Up Chart
 
+<img width="1024" height="633" alt="image" src="https://github.com/user-attachments/assets/483060eb-87de-46e4-8bf1-c4b71e9e71aa" />
 
 
 
