@@ -84,12 +84,15 @@ Sprint 4, HabiMatch. The physical, labeled burnup chart is posted in the lab. Th
 
 ## Initial Scrum Board
 
-Sprint 4, HabiMatch. The physical scrum (task) board is posted in the lab and labeled with the sprint number and project name. Each task sits in the same row as its user story. At the start of the sprint nothing is in the Tasks Completed column, and the tasks that have an owner are in Tasks In Progress.
+Sprint 4, HabiMatch. The physical scrum (task) board is posted in the lab and labeled with the sprint number and project name. At the start of the sprint nothing is in the Tasks Completed column, and the tasks that have an owner are in Tasks In Progress.
 
 | User Stories | Tasks Not Started | Tasks In Progress | Tasks Completed |
 |---|---|---|---|
 | US-401 | US-401-B, US-401-C, US-401-D | US-401-A, US-401-E, US-401-F | |
 | US-402 | US-402-A, US-402-B | US-402-C, US-402-D | |
+
+<img width="600" height="371" alt="image" src="https://github.com/user-attachments/assets/a02de713-5e09-47ed-ad92-b5614a7186b2" />
+
 
 ## Scrum Times
 
