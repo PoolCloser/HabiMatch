@@ -91,7 +91,8 @@ Sprint 4, HabiMatch. The physical scrum (task) board is posted in the lab and la
 | US-401 | US-401-B, US-401-C, US-401-D | US-401-A, US-401-E, US-401-F | |
 | US-402 | US-402-A, US-402-B | US-402-C, US-402-D | |
 
-<img width="600" height="371" alt="image" src="https://github.com/user-attachments/assets/a02de713-5e09-47ed-ad92-b5614a7186b2" />
+<img width="600" height="371" alt="image" src="https://github.com/user-attachments/assets/60c3f21a-474e-4ef6-920c-e5285c17b578" />
+
 
 
 ## Scrum Times
