@@ -778,7 +778,7 @@ export default function HomeScreen() {
                     onPress={() => setHideAlcoholUsers(value => !value)}
                   >
                     <Text style={[styles.filterPillText, hideAlcoholUsers && styles.filterPillTextActive]}>
-                      No alcohol at home
+                      No alcohol
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
